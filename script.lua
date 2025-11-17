@@ -97,6 +97,66 @@ if not isfolder(BACKUP_FOLDER) then
     makefolder(BACKUP_FOLDER)
 end
 
+function Library:add_command(label, action)
+    table.insert(self._commands, { label = label, action = action })
+    self:_refresh_command_palette()
+end
+
+function Library:_refresh_command_palette(filter)
+    if not self._command_palette then return end
+    local holder = self._command_palette.List
+    if not holder then return end
+    for _, child in ipairs(holder:GetChildren()) do
+        if child:IsA('TextButton') then child:Destroy() end
+    end
+    local query = string.lower(filter or self._command_palette.Search.Text or '')
+    for _, cmd in ipairs(self._commands) do
+        if query == '' or string.find(string.lower(cmd.label), query, 1, true) then
+            local btn = Instance.new('TextButton', holder)
+            btn.Size = UDim2.new(1,-6,0,28)
+            btn.BackgroundTransparency = 0.1
+            btn.Text = cmd.label
+            btn.TextSize = 12
+            btn.Font = Enum.Font.Gotham
+            btn.AutoButtonColor = false
+            btn.BackgroundColor3 = self._current_theme.ButtonIdle
+            self:_track_theme(btn, { BackgroundColor3 = 'ButtonIdle', TextColor3 = 'TextPrimary' })
+            btn.MouseButton1Click:Connect(function()
+                if cmd.action then pcall(cmd.action) end
+                self:_toggle_palette(false)
+            end)
+        end
+    end
+end
+
+function Library:_toggle_palette(state)
+    if not self._command_palette then return end
+    local target = state ~= false
+    self._command_palette.Visible = target
+    if target then
+        self:_refresh_command_palette()
+        self._command_palette.Search.Text = ''
+        self._command_palette.Search:CaptureFocus()
+    else
+        self._command_palette.Search:ReleaseFocus()
+    end
+end
+
+local BACKUP_FOLDER = "click/backups"
+if not isfolder(BACKUP_FOLDER) then
+    makefolder(BACKUP_FOLDER)
+end
+
+local BACKUP_FOLDER = "click/backups"
+if not isfolder(BACKUP_FOLDER) then
+    makefolder(BACKUP_FOLDER)
+end
+
+local BACKUP_FOLDER = "click/backups"
+if not isfolder(BACKUP_FOLDER) then
+    makefolder(BACKUP_FOLDER)
+end
+
 -- remove old UI if present
 local old_click = CoreGui:FindFirstChild('click')
 if old_click then
@@ -647,6 +707,126 @@ function Library:_attach_tooltip(instance, text)
     end)
 end
 
+function Library:_track_theme(instance, propMap)
+    if not instance then return end
+    table.insert(self._theme_targets, { instance = instance, props = propMap })
+end
+
+function Library:apply_theme_to_existing_ui()
+    local base = self._themes[self._current_theme_name] or self._themes.DarkAmber
+    local appearance = self._config._library.appearance or {}
+    local theme = Util.shallow_copy(base)
+    if appearance.accent_override then
+        local c = Util.table_to_color(appearance.accent_override, base.AccentColor)
+        theme.AccentColor = c
+        theme.ToggleOn = c
+        theme.NotificationAccent = c
+    end
+    for _, target in ipairs(self._theme_targets) do
+        local inst = target.instance
+        if inst and inst.Parent then
+            local props = {}
+            for prop, key in pairs(target.props or {}) do
+                local value = theme[key] or target.default
+                props[prop] = value
+            end
+            Util.tween(inst, self._config._library.animations_enabled and 0.2 or 0, props)
+        end
+    end
+end
+
+function Library:set_theme(name)
+    if not self._themes[name] then return end
+    self._current_theme_name = name
+    self._current_theme = self._themes[name]
+    self._config._library.theme = name
+    Config:save_file('default', self._config)
+    self:apply_theme_to_existing_ui()
+    self:log('info', 'Theme set to '..tostring(name))
+end
+
+function Library:_create_tooltip_layer()
+    if self._tooltip_layer then return self._tooltip_layer end
+    if not self._ui then return end
+    local theme = self._current_theme or self._themes.DarkAmber
+    local tip = Instance.new('Frame')
+    tip.Name = 'Tooltip'
+    tip.Size = UDim2.new(0,150,0,32)
+    tip.BackgroundColor3 = theme.ModuleBackground
+    tip.BackgroundTransparency = 0.05
+    tip.Visible = false
+    tip.Parent = self._ui
+    tip.ZIndex = 10
+    local stroke = Instance.new('UIStroke', tip)
+    stroke.Thickness = 1
+    stroke.Color = theme.BorderColor
+    local corner = Instance.new('UICorner', tip)
+    corner.CornerRadius = UDim.new(0,6)
+    local label = Instance.new('TextLabel', tip)
+    label.BackgroundTransparency = 1
+    label.Size = UDim2.new(1,-10,1,-10)
+    label.Position = UDim2.new(0,5,0,5)
+    label.TextWrapped = true
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.TextYAlignment = Enum.TextYAlignment.Top
+    label.TextColor3 = theme.TextPrimary
+    label.Font = Enum.Font.Gotham
+    label.TextSize = 12
+    label.Name = 'Text'
+    self:_track_theme(tip, { BackgroundColor3 = 'ModuleBackground' })
+    self:_track_theme(stroke, { Color = 'BorderColor' })
+    self:_track_theme(label, { TextColor3 = 'TextPrimary' })
+    self._tooltip_layer = tip
+    return tip
+end
+
+function Library:_attach_tooltip(instance, text)
+    if not instance then return end
+    local tip = self:_create_tooltip_layer()
+    if not tip then return end
+    instance.MouseEnter:Connect(function()
+        tip.Visible = true
+        local lbl = tip:FindFirstChild('Text')
+        if lbl then lbl.Text = text or '' end
+    end)
+    instance.MouseLeave:Connect(function()
+        tip.Visible = false
+    end)
+    instance.MouseMoved:Connect(function(x,y)
+        tip.Position = UDim2.fromOffset(x+12, y+12)
+    end)
+end
+
+function Library:_track_theme(instance, propMap)
+    if not instance then return end
+    table.insert(self._theme_targets, { instance = instance, props = propMap })
+end
+
+function Library:apply_theme_to_existing_ui()
+    local theme = self._current_theme or self._themes.DarkAmber
+    for _, target in ipairs(self._theme_targets) do
+        local inst = target.instance
+        if inst and inst.Parent then
+            local props = {}
+            for prop, key in pairs(target.props or {}) do
+                local value = theme[key] or target.default
+                props[prop] = value
+            end
+            Util.tween(inst, self._config._library.animations_enabled and 0.2 or 0, props)
+        end
+    end
+end
+
+function Library:set_theme(name)
+    if not self._themes[name] then return end
+    self._current_theme_name = name
+    self._current_theme = self._themes[name]
+    self._config._library.theme = name
+    Config:save_file('default', self._config)
+    self:apply_theme_to_existing_ui()
+    self:log('info', 'Theme set to '..tostring(name))
+end
+
 -- Notification system
 local NotificationContainer
 do
@@ -984,6 +1164,24 @@ function Library:create_ui()
             self:_toggle_palette(not (self._command_palette and self._command_palette.Visible))
         end
     end))
+
+    function self:log(log_type, text)
+        table.insert(self._log_entries, { type = log_type or 'info', text = tostring(text), timestamp = os.time() })
+        if self._console_output then pcall(self._console_output) end
+    end
+
+    Connections:add('palette_toggle', UserInputService.InputBegan:Connect(function(input, processed)
+        if processed then return end
+        if not self._config._library.enable_command_palette then return end
+        if input.KeyCode == Enum.KeyCode.K and (UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) or UserInputService:IsKeyDown(Enum.KeyCode.RightControl)) then
+            self:_toggle_palette(not (self._command_palette and self._command_palette.Visible))
+        end
+    end))
+
+    function self:log(log_type, text)
+        table.insert(self._log_entries, { type = log_type or 'info', text = tostring(text), timestamp = os.time() })
+        if self._console_output then pcall(self._console_output) end
+    end
 
     -- Tab creation
     function self:create_tab(title, icon)
@@ -1546,6 +1744,32 @@ function Library:create_ui()
             if Shadow then Shadow.Position = UDim2.new(0.5,4+offset.X,0.5,8+offset.Y) end
         end
     end))
+
+    -- parallax effect
+    local basePosition = Container.Position
+    if self._config._library.parallax_enabled ~= false then
+        Connections:add('parallax', UserInputService.InputChanged:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseMovement and self._ui.Enabled then
+                local viewport = workspace.CurrentCamera.ViewportSize
+                local offset = Vector2.new((input.Position.X - viewport.X/2) * self._parallax_strength, (input.Position.Y - viewport.Y/2) * self._parallax_strength)
+                Container.Position = basePosition + UDim2.new(0, offset.X, 0, offset.Y)
+                if Shadow then Shadow.Position = UDim2.new(0.5,4+offset.X,0.5,8+offset.Y) end
+            end
+        end))
+    end
+
+    -- parallax effect
+    local basePosition = Container.Position
+    if self._config._library.parallax_enabled ~= false then
+        Connections:add('parallax', UserInputService.InputChanged:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseMovement and self._ui.Enabled then
+                local viewport = workspace.CurrentCamera.ViewportSize
+                local offset = Vector2.new((input.Position.X - viewport.X/2) * self._parallax_strength, (input.Position.Y - viewport.Y/2) * self._parallax_strength)
+                Container.Position = basePosition + UDim2.new(0, offset.X, 0, offset.Y)
+                if Shadow then Shadow.Position = UDim2.new(0.5,4+offset.X,0.5,8+offset.Y) end
+            end
+        end))
+    end
 
     -- utility: create bare button in a section
     function self:create_button(section, text, callback)
