@@ -52,6 +52,11 @@ if not isfolder(BACKUP_FOLDER) then
     makefolder(BACKUP_FOLDER)
 end
 
+local BACKUP_FOLDER = "click/backups"
+if not isfolder(BACKUP_FOLDER) then
+    makefolder(BACKUP_FOLDER)
+end
+
 -- remove old UI if present
 local old_click = CoreGui:FindFirstChild('click')
 if old_click then
