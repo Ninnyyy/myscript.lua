@@ -12,7 +12,11 @@ This repository contains an expanded Roblox exploit UI script (`script.lua`) tha
   - `CLICK_UI.rename_config(old_name, new_name)` – clones and deletes to rename a stored profile.
   - `CLICK_UI.get_config_metadata(name)` – returns creation/update metadata for a stored profile.
   - `CLICK_UI.reset_default_config()` – rebuilds and saves a fresh default config.
+  - `CLICK_UI.backup_config(name, max_backups?)` – snapshots the current JSON before overwriting it and prunes to `max_backups` (defaults to 5).
+  - `CLICK_UI.list_backups(name)` – lists timestamped backups for a given profile.
+  - `CLICK_UI.restore_backup(name, timestamp?)` – reloads a profile from its latest (or specified) backup without creating a new one.
 - Config files now include metadata (`name`, `created_at`, `updated_at`) so scripts can show timestamps or labels inside the UI.
+- Automatic backup rotation protects configs from bad imports or save corruption while keeping the latest few snapshots per profile.
 - Utility functions for safe HTTP requests, optional blur, autosave, notifications, and a watermark showing the local player's name and FPS.
 
 ## Usage
