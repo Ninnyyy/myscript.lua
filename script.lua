@@ -201,10 +201,35 @@ end
 function AcrylicBlur:change_visibility(state) if self._root then self._root.Transparency = state and 0.98 or 1 end end
 
 local Config = {}
-function Config.default()
-    return { _flags = {}, _keybinds = {}, _library = {}, ui = {} }
+function Config.default(name)
+    local now = os.time()
+    return {
+        _flags = {},
+        _keybinds = {},
+        _library = {},
+        ui = {},
+        meta = { name = name or 'default', created_at = now, updated_at = now }
+    }
+end
+function Config:normalize(data, name, opts)
+    data = data or {}
+    opts = opts or {}
+    data._flags = data._flags or {}
+    data._keybinds = data._keybinds or {}
+    data._library = data._library or {}
+    data.ui = data.ui or {}
+    data.meta = data.meta or {}
+    data.meta.name = name or data.meta.name or 'default'
+    data.meta.created_at = data.meta.created_at or os.time()
+    if opts.touch_time == false then
+        data.meta.updated_at = data.meta.updated_at or os.time()
+    else
+        data.meta.updated_at = os.time()
+    end
+    return data
 end
 function Config:save_file(file_name, data)
+    data = self:normalize(data, file_name)
     local ok, err = pcall(function()
         writefile('click/'..file_name..'.json', HttpService:JSONEncode(data))
     end)
@@ -215,7 +240,7 @@ function Config:read_file(file_name)
         if not isfile('click/'..file_name..'.json') then return nil end
         local s = readfile('click/'..file_name..'.json')
         if not s then return nil end
-        return HttpService:JSONDecode(s)
+        return self:normalize(HttpService:JSONDecode(s), file_name, { touch_time = false })
     end)
     if not ok then warn('[click] read failed:', res) return nil end
     return res
@@ -237,13 +262,26 @@ function Config:delete_file(file_name)
     if not ok then warn('[click] delete failed:', err) return false end
     return true
 end
+function Config:clone_file(source_name, target_name)
+    if not source_name or not target_name then return false, 'missing name' end
+    local data = self:read_file(source_name)
+    if not data then return false, 'missing source' end
+    self:save_file(target_name, data)
+    return true
+end
+function Config:rename_file(source_name, target_name)
+    local ok, err = self:clone_file(source_name, target_name)
+    if not ok then return ok, err end
+    self:delete_file(source_name)
+    return true
+end
 
 -- LIBRARY (main)
 local Library = {}
 Library.__index = Library
 function Library.new()
     local self = setmetatable({
-        _config = Config:read_file('default') or Config.default(),
+        _config = Config:read_file('default') or Config.default('default'),
         _ui = nil,
         _ui_loaded = false,
         _tab = 0,
@@ -661,7 +699,15 @@ end
 getgenv().CLICK_UI = {
     library = UI,
     send_notification = Library.SendNotification,
-    save_config = function(name) Config:save_file(name or 'default', UI._config) end,
+    save_config = function(name)
+        Config:save_file(name or 'default', UI._config)
+    end,
+    save_config_as = function(name)
+        if not name or name == '' then return false, 'missing name' end
+        Config:save_file(name, UI._config)
+        Library.SendNotification({ title = "Config", text = "Saved as "..name })
+        return true
+    end,
     load_config = function(name)
         local data = Config:read_file(name or 'default')
         if data then UI._config = data; Library.SendNotification({ title="Config", text="Loaded "..(name or 'default') }) end
@@ -670,6 +716,10 @@ getgenv().CLICK_UI = {
         local data = Config:read_file(name or 'default')
         if not data then return nil end
         return HttpService:JSONEncode(data)
+    end,
+    get_config_metadata = function(name)
+        local data = Config:read_file(name or 'default')
+        return data and data.meta or nil
     end,
     list_configs = function()
         return Config:list_configs()
@@ -684,8 +734,22 @@ getgenv().CLICK_UI = {
         end
         return ok
     end,
+    rename_config = function(source, target)
+        local from = source or 'default'
+        local to = target or 'default'
+        local ok, err = Config:rename_file(from, to)
+        if ok then
+            if UI._config.meta and UI._config.meta.name == from then
+                UI._config.meta.name = to
+            end
+            Library.SendNotification({ title = "Config", text = string.format("Renamed %s to %s", from, to) })
+        else
+            Library.SendNotification({ title = "Config", text = "Rename failed: "..(err or "") })
+        end
+        return ok
+    end,
     reset_default_config = function()
-        UI._config = Config.default()
+        UI._config = Config.default('default')
         Config:save_file('default', UI._config)
         Library.SendNotification({ title = "Config", text = "Reset default configuration" })
         return UI._config
@@ -693,8 +757,9 @@ getgenv().CLICK_UI = {
     import_config_raw = function(json_raw)
         local ok, tbl = pcall(function() return HttpService:JSONDecode(json_raw) end)
         if not ok then return false, "invalid json" end
-        Config:save_file('default', tbl)
-        UI._config = tbl
+        local normalized = Config:normalize(tbl, 'default')
+        Config:save_file('default', normalized)
+        UI._config = normalized
         return true
     end,
     open_ui = function() UI:show() end,
