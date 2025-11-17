@@ -147,6 +147,56 @@ if not isfolder(BACKUP_FOLDER) then
     makefolder(BACKUP_FOLDER)
 end
 
+function Library:add_command(label, action)
+    table.insert(self._commands, { label = label, action = action })
+    self:_refresh_command_palette()
+end
+
+function Library:_refresh_command_palette(filter)
+    if not self._command_palette then return end
+    local holder = self._command_palette.List
+    if not holder then return end
+    for _, child in ipairs(holder:GetChildren()) do
+        if child:IsA('TextButton') then child:Destroy() end
+    end
+    local query = string.lower(filter or self._command_palette.Search.Text or '')
+    for _, cmd in ipairs(self._commands) do
+        if query == '' or string.find(string.lower(cmd.label), query, 1, true) then
+            local btn = Instance.new('TextButton', holder)
+            btn.Size = UDim2.new(1,-6,0,28)
+            btn.BackgroundTransparency = 0.1
+            btn.Text = cmd.label
+            btn.TextSize = 12
+            btn.Font = Enum.Font.Gotham
+            btn.AutoButtonColor = false
+            btn.BackgroundColor3 = self._current_theme.ButtonIdle
+            self:_track_theme(btn, { BackgroundColor3 = 'ButtonIdle', TextColor3 = 'TextPrimary' })
+            btn.MouseButton1Click:Connect(function()
+                if cmd.action then pcall(cmd.action) end
+                self:_toggle_palette(false)
+            end)
+        end
+    end
+end
+
+function Library:_toggle_palette(state)
+    if not self._command_palette then return end
+    local target = state ~= false
+    self._command_palette.Visible = target
+    if target then
+        self:_refresh_command_palette()
+        self._command_palette.Search.Text = ''
+        self._command_palette.Search:CaptureFocus()
+    else
+        self._command_palette.Search:ReleaseFocus()
+    end
+end
+
+local BACKUP_FOLDER = "click/backups"
+if not isfolder(BACKUP_FOLDER) then
+    makefolder(BACKUP_FOLDER)
+end
+
 local BACKUP_FOLDER = "click/backups"
 if not isfolder(BACKUP_FOLDER) then
     makefolder(BACKUP_FOLDER)
@@ -803,6 +853,96 @@ function Library:_track_theme(instance, propMap)
 end
 
 function Library:apply_theme_to_existing_ui()
+    local base = self._themes[self._current_theme_name] or self._themes.DarkAmber
+    local appearance = self._config._library.appearance or {}
+    local theme = Util.shallow_copy(base)
+    if appearance.accent_override then
+        local c = Util.table_to_color(appearance.accent_override, base.AccentColor)
+        theme.AccentColor = c
+        theme.ToggleOn = c
+        theme.NotificationAccent = c
+    end
+    for _, target in ipairs(self._theme_targets) do
+        local inst = target.instance
+        if inst and inst.Parent then
+            local props = {}
+            for prop, key in pairs(target.props or {}) do
+                local value = theme[key] or target.default
+                props[prop] = value
+            end
+            Util.tween(inst, self._config._library.animations_enabled and 0.2 or 0, props)
+        end
+    end
+end
+
+function Library:set_theme(name)
+    if not self._themes[name] then return end
+    self._current_theme_name = name
+    self._current_theme = self._themes[name]
+    self._config._library.theme = name
+    Config:save_file('default', self._config)
+    self:apply_theme_to_existing_ui()
+    self:log('info', 'Theme set to '..tostring(name))
+end
+
+function Library:_create_tooltip_layer()
+    if self._tooltip_layer then return self._tooltip_layer end
+    if not self._ui then return end
+    local theme = self._current_theme or self._themes.DarkAmber
+    local tip = Instance.new('Frame')
+    tip.Name = 'Tooltip'
+    tip.Size = UDim2.new(0,150,0,32)
+    tip.BackgroundColor3 = theme.ModuleBackground
+    tip.BackgroundTransparency = 0.05
+    tip.Visible = false
+    tip.Parent = self._ui
+    tip.ZIndex = 10
+    local stroke = Instance.new('UIStroke', tip)
+    stroke.Thickness = 1
+    stroke.Color = theme.BorderColor
+    local corner = Instance.new('UICorner', tip)
+    corner.CornerRadius = UDim.new(0,6)
+    local label = Instance.new('TextLabel', tip)
+    label.BackgroundTransparency = 1
+    label.Size = UDim2.new(1,-10,1,-10)
+    label.Position = UDim2.new(0,5,0,5)
+    label.TextWrapped = true
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.TextYAlignment = Enum.TextYAlignment.Top
+    label.TextColor3 = theme.TextPrimary
+    label.Font = Enum.Font.Gotham
+    label.TextSize = 12
+    label.Name = 'Text'
+    self:_track_theme(tip, { BackgroundColor3 = 'ModuleBackground' })
+    self:_track_theme(stroke, { Color = 'BorderColor' })
+    self:_track_theme(label, { TextColor3 = 'TextPrimary' })
+    self._tooltip_layer = tip
+    return tip
+end
+
+function Library:_attach_tooltip(instance, text)
+    if not instance then return end
+    local tip = self:_create_tooltip_layer()
+    if not tip then return end
+    instance.MouseEnter:Connect(function()
+        tip.Visible = true
+        local lbl = tip:FindFirstChild('Text')
+        if lbl then lbl.Text = text or '' end
+    end)
+    instance.MouseLeave:Connect(function()
+        tip.Visible = false
+    end)
+    instance.MouseMoved:Connect(function(x,y)
+        tip.Position = UDim2.fromOffset(x+12, y+12)
+    end)
+end
+
+function Library:_track_theme(instance, propMap)
+    if not instance then return end
+    table.insert(self._theme_targets, { instance = instance, props = propMap })
+end
+
+function Library:apply_theme_to_existing_ui()
     local theme = self._current_theme or self._themes.DarkAmber
     for _, target in ipairs(self._theme_targets) do
         local inst = target.instance
@@ -1170,6 +1310,32 @@ function Library:create_ui()
         if self._console_output then pcall(self._console_output) end
     end
 
+    function self:_update_badge(tab_obj)
+        local badge = self._tab_badges[tab_obj]
+        if not badge then return end
+        local count = 0
+        for _, mod in pairs(self._modules) do
+            if mod._tab == tab_obj and mod._state then
+                count = count + 1
+            end
+        end
+        badge.Text = tostring(count)
+        badge.Visible = count > 0
+    end
+
+    Connections:add('palette_toggle', UserInputService.InputBegan:Connect(function(input, processed)
+        if processed then return end
+        if not self._config._library.enable_command_palette then return end
+        if input.KeyCode == Enum.KeyCode.K and (UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) or UserInputService:IsKeyDown(Enum.KeyCode.RightControl)) then
+            self:_toggle_palette(not (self._command_palette and self._command_palette.Visible))
+        end
+    end))
+
+    function self:log(log_type, text)
+        table.insert(self._log_entries, { type = log_type or 'info', text = tostring(text), timestamp = os.time() })
+        if self._console_output then pcall(self._console_output) end
+    end
+
     Connections:add('palette_toggle', UserInputService.InputBegan:Connect(function(input, processed)
         if processed then return end
         if not self._config._library.enable_command_palette then return end
@@ -1258,6 +1424,12 @@ function Library:create_ui()
             end)
         end
 
+        if self._config._library.enable_command_palette then
+            self:add_command('Open Tab: '..title, function()
+                activate()
+            end)
+        end
+
         local TabManager = {}
 
         -- create module function
@@ -1317,6 +1489,69 @@ function Library:create_ui()
                 self_library = Library
                 Library._config._flags[flag] = state
                 Config:save_file('default', Library._config)
+            end
+
+            function manager:add_section(title)
+                local SectionFrame = Instance.new('Frame', Options)
+                SectionFrame.Size = UDim2.new(1,-10,0,30)
+                SectionFrame.BackgroundTransparency = 1
+                local HeaderRow = Instance.new('TextButton', SectionFrame)
+                HeaderRow.Size = UDim2.new(1,0,0,26)
+                HeaderRow.BackgroundTransparency = 1
+                HeaderRow.AutoButtonColor = false
+                local Arrow = Instance.new('TextLabel', HeaderRow)
+                Arrow.Size = UDim2.new(0,18,0,18)
+                Arrow.Position = UDim2.new(0,0,0.5,0)
+                Arrow.AnchorPoint = Vector2.new(0,0.5)
+                Arrow.Text = '>'
+                Arrow.TextSize = 12
+                Arrow.Font = Enum.Font.GothamBold
+                Arrow.BackgroundTransparency = 1
+                Arrow.TextColor3 = Library._current_theme.TextSecondary
+                local TitleLbl = Instance.new('TextLabel', HeaderRow)
+                TitleLbl.Size = UDim2.new(1,-20,1,0)
+                TitleLbl.Position = UDim2.new(0,20,0,0)
+                TitleLbl.BackgroundTransparency = 1
+                TitleLbl.TextXAlignment = Enum.TextXAlignment.Left
+                TitleLbl.Text = title or 'Section'
+                TitleLbl.TextColor3 = Library._current_theme.TextPrimary
+                TitleLbl.Font = Enum.Font.Gotham
+                TitleLbl.TextSize = 12
+                Library:_track_theme(Arrow, { TextColor3 = 'TextSecondary' })
+                Library:_track_theme(TitleLbl, { TextColor3 = 'TextPrimary' })
+
+                local Body = Instance.new('Frame', SectionFrame)
+                Body.Size = UDim2.new(1,0,0,0)
+                Body.Position = UDim2.new(0,0,1,0)
+                Body.BackgroundTransparency = 1
+                Body.Visible = false
+                local layout = Instance.new('UIListLayout', Body)
+                layout.Padding = UDim.new(0,5)
+                layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+
+                local section = { _body = Body, _open = false, _size = 0 }
+                function section:update_size()
+                    manager._mult = manager._mult + (self._open and self._size or 0)
+                    manager._size = manager._size + (self._open and self._size or 0)
+                end
+                function section:add_child(child)
+                    if not child then return end
+                    child.Parent = Body
+                    Body.Visible = true
+                    self._size = self._size + child.Size.Y.Offset + 5
+                end
+                local function toggle()
+                    section._open = not section._open
+                    Arrow.Text = section._open and 'v' or '>'
+                    Body.Visible = section._open
+                    Util.tween(Body, Library._animations_enabled and 0.25 or 0, {Size = UDim2.new(1,0,0, section._open and section._size or 0)})
+                    if manager._state then
+                        manager:change_state(true)
+                    end
+                end
+                HeaderRow.MouseButton1Click:Connect(toggle)
+                manager._mult = manager._mult + 30
+                return section
             end
 
             function manager:add_section(title)
@@ -1718,6 +1953,281 @@ function Library:create_ui()
                 return apply_color
             end
 
+            function manager:add_slider(settings)
+                settings = settings or {}
+                local min = settings.min or 0
+                local max = settings.max or 1
+                local default = settings.default or min
+                local flag = settings.flag
+                local value = Library._config._flags[flag] or default
+                local row = Instance.new('Frame', Options); row.Size=UDim2.new(1, -10,0,32); row.BackgroundTransparency=1
+                local label = Instance.new('TextLabel', row); label.BackgroundTransparency=1; label.Text = settings.text or 'Slider'; label.TextXAlignment = Enum.TextXAlignment.Left; label.Position=UDim2.new(0.02,0,0,0); label.Size=UDim2.new(0.6,0,1,0); label.TextColor3 = Library._current_theme.TextPrimary; label.Font = Enum.Font.Gotham; label.TextSize = 12
+                local valueLabel = Instance.new('TextLabel', row); valueLabel.BackgroundTransparency=1; valueLabel.Text = tostring(value); valueLabel.TextSize=12; valueLabel.Font=Enum.Font.Gotham; valueLabel.TextColor3=Library._current_theme.TextSecondary; valueLabel.Position = UDim2.new(0.7,0,0,0); valueLabel.Size = UDim2.new(0.28,0,1,0)
+                valueLabel.TextXAlignment = Enum.TextXAlignment.Right
+                local bar = Instance.new('Frame', row); bar.Size=UDim2.new(0.6,0,0,6); bar.Position=UDim2.new(0.02,0,1,-8); bar.BackgroundColor3 = Library._current_theme.BorderColor; bar.BorderSizePixel=0
+                local bcorner = Instance.new('UICorner', bar); bcorner.CornerRadius = UDim.new(1,0)
+                local fill = Instance.new('Frame', bar); fill.Size = UDim2.new((value - min)/(max - min),0,1,0); fill.BackgroundColor3 = Library._current_theme.AccentColor; fill.BorderSizePixel=0
+                local fcorner = Instance.new('UICorner', fill); fcorner.CornerRadius = UDim.new(1,0)
+                Library:_track_theme(label, { TextColor3 = 'TextPrimary' })
+                Library:_track_theme(valueLabel, { TextColor3 = 'TextSecondary' })
+                Library:_track_theme(bar, { BackgroundColor3 = 'BorderColor' })
+                Library:_track_theme(fill, { BackgroundColor3 = 'AccentColor' })
+                local function set_value(new)
+                    value = math.clamp(new, min, max)
+                    Library._config._flags[flag] = value
+                    Config:save_file('default', Library._config)
+                    fill.Size = UDim2.new((value - min)/(max - min),0,1,0)
+                    valueLabel.Text = string.format("%.2f", value)
+                    if settings.on_changed then pcall(settings.on_changed, value) end
+                end
+                bar.InputBegan:Connect(function(inp)
+                    if inp.UserInputType == Enum.UserInputType.MouseButton1 then
+                        local conn
+                        local function update(pos)
+                            local rel = (pos.X - bar.AbsolutePosition.X)/bar.AbsoluteSize.X
+                            set_value(min + (max-min) * rel)
+                        end
+                        update(inp.Position)
+                        conn = UserInputService.InputChanged:Connect(function(i)
+                            if i.UserInputType == Enum.UserInputType.MouseMovement then
+                                update(i.Position)
+                            end
+                        end)
+                        UserInputService.InputEnded:Connect(function(endInput)
+                            if endInput.UserInputType == Enum.UserInputType.MouseButton1 and conn then conn:Disconnect() end
+                        end)
+                    end
+                end)
+                manager._size = manager._size + 36
+                return set_value
+            end
+
+            function manager:add_dropdown(settings)
+                settings = settings or {}
+                local flag = settings.flag or settings.text
+                local current = Library._config._flags[flag] or settings.default or (settings.items and settings.items[1])
+                local row = Instance.new('Frame', Options); row.Size=UDim2.new(1,-10,0,32); row.BackgroundTransparency=1
+                local label = Instance.new('TextLabel', row); label.Text = settings.text or 'Dropdown'; label.TextSize=12; label.BackgroundTransparency=1; label.Position=UDim2.new(0.02,0,0,0); label.Size=UDim2.new(0.6,0,1,0); label.TextXAlignment = Enum.TextXAlignment.Left
+                local button = Instance.new('TextButton', row); button.Size=UDim2.new(0.36,0,0,24); button.Position=UDim2.new(0.62,0,0.5,0); button.AnchorPoint=Vector2.new(0,0.5); button.Text = tostring(current); button.TextSize=12; button.Font=Enum.Font.Gotham; button.BackgroundColor3 = Library._current_theme.ButtonIdle; button.AutoButtonColor=false
+                local bcorner = Instance.new('UICorner', button); bcorner.CornerRadius = UDim.new(0,5)
+                self:_track_theme(label, { TextColor3 = 'TextPrimary' })
+                self:_track_theme(button, { BackgroundColor3 = 'ButtonIdle', TextColor3 = 'TextPrimary' })
+
+                local popup = Instance.new('Frame', row)
+                popup.Size = UDim2.new(1,-10,0,0)
+                popup.Position = UDim2.new(0,5,1,2)
+                popup.BackgroundColor3 = Library._current_theme.ModuleBackground
+                popup.BorderSizePixel = 0
+                popup.Visible = false
+                popup.ClipsDescendants = true
+                local pcorner = Instance.new('UICorner', popup); pcorner.CornerRadius = UDim.new(0,6)
+                local search = Instance.new('TextBox', popup)
+                search.Size = UDim2.new(1,-10,0,24)
+                search.Position = UDim2.new(0,5,0,5)
+                search.BackgroundColor3 = Library._current_theme.ButtonIdle
+                search.PlaceholderText = 'Search...'
+                search.TextSize = 12
+                search.TextColor3 = Library._current_theme.TextPrimary
+                search.ClearTextOnFocus = false
+                local scorner = Instance.new('UICorner', search); scorner.CornerRadius = UDim.new(0,5)
+                local list = Instance.new('ScrollingFrame', popup)
+                list.Size = UDim2.new(1,-10,1,-38)
+                list.Position = UDim2.new(0,5,0,34)
+                list.BackgroundTransparency = 1
+                list.ScrollBarThickness = 4
+                local layout = Instance.new('UIListLayout', list)
+                layout.SortOrder = Enum.SortOrder.LayoutOrder
+                layout.Padding = UDim.new(0,4)
+                self:_track_theme(popup, { BackgroundColor3 = 'ModuleBackground' })
+                self:_track_theme(search, { BackgroundColor3 = 'ButtonIdle', TextColor3 = 'TextPrimary' })
+
+                local function refresh(filter)
+                    for _, child in ipairs(list:GetChildren()) do
+                        if child:IsA('TextButton') then child:Destroy() end
+                    end
+                    local query = string.lower(filter or '')
+                    for _, item in ipairs(settings.items or {}) do
+                        if query == '' or string.find(string.lower(item), query, 1, true) then
+                            local opt = Instance.new('TextButton', list)
+                            opt.Size = UDim2.new(1,0,0,22)
+                            opt.BackgroundColor3 = Library._current_theme.ButtonIdle
+                            opt.Text = item
+                            opt.TextSize = 12
+                            opt.Font = Enum.Font.Gotham
+                            opt.AutoButtonColor = false
+                            local ocorner = Instance.new('UICorner', opt); ocorner.CornerRadius = UDim.new(0,4)
+                            self:_track_theme(opt, { BackgroundColor3 = 'ButtonIdle', TextColor3 = 'TextPrimary' })
+                            opt.MouseButton1Click:Connect(function()
+                                current = item
+                                button.Text = item
+                                popup.Visible = false
+                                Library._config._flags[flag] = item
+                                Config:save_file('default', Library._config)
+                                if settings.on_changed then pcall(settings.on_changed, item) end
+                            end)
+                        end
+                    end
+                end
+                refresh()
+                search:GetPropertyChangedSignal('Text'):Connect(function()
+                    refresh(search.Text)
+                end)
+                button.MouseButton1Click:Connect(function()
+                    popup.Visible = not popup.Visible
+                    popup.Size = popup.Visible and UDim2.new(1,-10,0,140) or UDim2.new(1,-10,0,0)
+                    if popup.Visible then search:CaptureFocus() else search:ReleaseFocus() end
+                end)
+                manager._size = manager._size + 40
+                return refresh
+            end
+
+            function manager:add_colorpicker(settings)
+                settings = settings or {}
+                local flag = settings.flag
+                local default = settings.default or Color3.new(1,1,1)
+                local stored = Util.table_to_color(Library._config._flags[flag], default)
+                local current = stored
+                local row = Instance.new('Frame', Options); row.Size=UDim2.new(1,-10,0,34); row.BackgroundTransparency=1
+                local label = Instance.new('TextLabel', row); label.Text = settings.text or 'Color'; label.TextSize=12; label.BackgroundTransparency=1; label.Position=UDim2.new(0.02,0,0,0); label.Size=UDim2.new(0.5,0,1,0); label.TextXAlignment = Enum.TextXAlignment.Left
+                local preview = Instance.new('TextButton', row); preview.Size=UDim2.new(0,30,0,24); preview.Position=UDim2.new(1,-40,0.5,0); preview.AnchorPoint=Vector2.new(1,0.5); preview.BackgroundColor3=current; preview.AutoButtonColor=false; preview.Text=""
+                local pcorner = Instance.new('UICorner', preview); pcorner.CornerRadius = UDim.new(0,5)
+                self:_track_theme(label, { TextColor3 = 'TextPrimary' })
+
+                local popup = Instance.new('Frame', row)
+                popup.Size = UDim2.new(1,-10,0,0)
+                popup.Position = UDim2.new(0,5,1,4)
+                popup.BackgroundColor3 = Library._current_theme.ModuleBackground
+                popup.BorderSizePixel = 0
+                popup.Visible = false
+                popup.ClipsDescendants = true
+                local popCorner = Instance.new('UICorner', popup); popCorner.CornerRadius = UDim.new(0,6)
+                self:_track_theme(popup, { BackgroundColor3 = 'ModuleBackground' })
+
+                local hueSlider = Instance.new('TextButton', popup)
+                hueSlider.Size = UDim2.new(1,-12,0,20)
+                hueSlider.Position = UDim2.new(0,6,0,6)
+                hueSlider.AutoButtonColor = false
+                hueSlider.Text = 'Hue'
+                hueSlider.BackgroundColor3 = Library._current_theme.ButtonIdle
+                self:_track_theme(hueSlider, { BackgroundColor3 = 'ButtonIdle', TextColor3 = 'TextPrimary' })
+                local valSlider = Instance.new('TextButton', popup)
+                valSlider.Size = UDim2.new(1,-12,0,20)
+                valSlider.Position = UDim2.new(0,6,0,34)
+                valSlider.AutoButtonColor = false
+                valSlider.Text = 'Brightness'
+                valSlider.BackgroundColor3 = Library._current_theme.ButtonIdle
+                self:_track_theme(valSlider, { BackgroundColor3 = 'ButtonIdle', TextColor3 = 'TextPrimary' })
+                local rgbInputs = Instance.new('Frame', popup)
+                rgbInputs.Size = UDim2.new(1,-12,0,26)
+                rgbInputs.Position = UDim2.new(0,6,0,62)
+                rgbInputs.BackgroundTransparency = 1
+                local layout = Instance.new('UIListLayout', rgbInputs)
+                layout.FillDirection = Enum.FillDirection.Horizontal
+                layout.Padding = UDim.new(0,4)
+                local fields = {}
+                for _, ch in ipairs({'R','G','B'}) do
+                    local box = Instance.new('TextBox', rgbInputs)
+                    box.Size = UDim2.new(0.3,0,1,0)
+                    box.BackgroundColor3 = Library._current_theme.ButtonIdle
+                    local base = (ch == 'R' and current.R) or (ch == 'G' and current.G) or current.B
+                    box.Text = tostring(math.floor(base*255))
+                    box.TextSize = 12
+                    box.Font = Enum.Font.Gotham
+                    box.TextColor3 = Library._current_theme.TextPrimary
+                    box.ClearTextOnFocus = false
+                    local bc = Instance.new('UICorner', box); bc.CornerRadius = UDim.new(0,4)
+                    self:_track_theme(box, { BackgroundColor3 = 'ButtonIdle', TextColor3 = 'TextPrimary' })
+                    fields[ch] = box
+                end
+                local hex = Instance.new('TextBox', popup)
+                hex.Size = UDim2.new(1,-12,0,20)
+                hex.Position = UDim2.new(0,6,0,94)
+                hex.BackgroundColor3 = Library._current_theme.ButtonIdle
+                hex.Text = string.format('#%02X%02X%02X', current.R*255, current.G*255, current.B*255)
+                hex.TextSize = 12
+                hex.Font = Enum.Font.Gotham
+                hex.TextColor3 = Library._current_theme.TextPrimary
+                hex.ClearTextOnFocus = false
+                local hc = Instance.new('UICorner', hex); hc.CornerRadius = UDim.new(0,4)
+                self:_track_theme(hex, { BackgroundColor3 = 'ButtonIdle', TextColor3 = 'TextPrimary' })
+
+                local previewSwatch = Instance.new('Frame', popup)
+                previewSwatch.Size = UDim2.new(1,-12,0,24)
+                previewSwatch.Position = UDim2.new(0,6,0,120)
+                previewSwatch.BackgroundColor3 = current
+                local psCorner = Instance.new('UICorner', previewSwatch); psCorner.CornerRadius = UDim.new(0,5)
+
+                local function apply_color(col)
+                    current = col
+                    preview.BackgroundColor3 = col
+                    previewSwatch.BackgroundColor3 = col
+                    fields.R.Text = tostring(math.floor(col.R*255))
+                    fields.G.Text = tostring(math.floor(col.G*255))
+                    fields.B.Text = tostring(math.floor(col.B*255))
+                    hex.Text = string.format('#%02X%02X%02X', col.R*255, col.G*255, col.B*255)
+                    Library._config._flags[flag] = Util.color_to_table(col)
+                    Config:save_file('default', Library._config)
+                    if settings.on_changed then pcall(settings.on_changed, col) end
+                end
+
+                local function slider_from_click(btn, cb)
+                    btn.InputBegan:Connect(function(inp)
+                        if inp.UserInputType == Enum.UserInputType.MouseButton1 then
+                            local conn
+                            local function update(pos)
+                                local rel = (pos.X - btn.AbsolutePosition.X)/btn.AbsoluteSize.X
+                                cb(math.clamp(rel,0,1))
+                            end
+                            update(inp.Position)
+                            conn = UserInputService.InputChanged:Connect(function(i)
+                                if i.UserInputType == Enum.UserInputType.MouseMovement then
+                                    update(i.Position)
+                                end
+                            end)
+                            UserInputService.InputEnded:Connect(function(endInput)
+                                if endInput.UserInputType == Enum.UserInputType.MouseButton1 and conn then conn:Disconnect() end
+                            end)
+                        end
+                    end)
+                end
+
+                slider_from_click(hueSlider, function(rel)
+                    local h = rel
+                    local s,v = 1, current and current.V or 1
+                    local col = Color3.fromHSV(h,1,current and select(3, Color3.toHSV(current)) or 1)
+                    apply_color(col)
+                end)
+                slider_from_click(valSlider, function(rel)
+                    local h,s,_ = Color3.toHSV(current)
+                    local col = Color3.fromHSV(h, s, rel)
+                    apply_color(col)
+                end)
+                for ch, box in pairs(fields) do
+                    box.FocusLost:Connect(function()
+                        local r = tonumber(fields.R.Text) or current.R*255
+                        local g = tonumber(fields.G.Text) or current.G*255
+                        local b = tonumber(fields.B.Text) or current.B*255
+                        apply_color(Color3.fromRGB(r,g,b))
+                    end)
+                end
+                hex.FocusLost:Connect(function()
+                    local txt = hex.Text:gsub('#','')
+                    if #txt == 6 then
+                        local r = tonumber(txt:sub(1,2),16) or current.R*255
+                        local g = tonumber(txt:sub(3,4),16) or current.G*255
+                        local b = tonumber(txt:sub(5,6),16) or current.B*255
+                        apply_color(Color3.fromRGB(r,g,b))
+                    end
+                end)
+
+                preview.MouseButton1Click:Connect(function()
+                    popup.Visible = not popup.Visible
+                    popup.Size = popup.Visible and UDim2.new(1,-10,0,150) or UDim2.new(1,-10,0,0)
+                end)
+                manager._size = manager._size + 44
+                return apply_color
+            end
+
             -- Add to module list & return manager
             self._modules[settings.flag or tostring(Module)] = manager
             return manager, Module, Options
@@ -1732,6 +2242,18 @@ function Library:create_ui()
             obj.Visible = (obj == left_section or obj == right_section)
         end
     end
+
+    -- parallax effect
+    local basePosition = Container.Position
+    Connections:add('parallax', UserInputService.InputChanged:Connect(function(input)
+        if UI._config._library.parallax_enabled == false then return end
+        if input.UserInputType == Enum.UserInputType.MouseMovement and self._ui.Enabled then
+            local viewport = workspace.CurrentCamera.ViewportSize
+            local offset = Vector2.new((input.Position.X - viewport.X/2) * self._parallax_strength, (input.Position.Y - viewport.Y/2) * self._parallax_strength)
+            Container.Position = basePosition + UDim2.new(0, offset.X, 0, offset.Y)
+            if Shadow then Shadow.Position = UDim2.new(0.5,4+offset.X,0.5,8+offset.Y) end
+        end
+    end))
 
     -- parallax effect
     local basePosition = Container.Position
@@ -1825,6 +2347,113 @@ do
     local modA_manager, modA_frame, modA_options = tm:create_module({ title = "Aimbot", description = "Example feature", flag = "aimbot" })
     modA_manager:add_toggle("Enable Aimbot", "aimbot")
     local btn = modA_options and UI:create_button(modA_options, "Open Config", function() UI.SendNotification({ title="Config", text="Open config clicked" }) end)
+end
+
+do
+    local settingsTab = UI:create_tab(Language.TabSettings or "Settings", "")
+    local left = select(2, settingsTab:create_module({ title = "UI", description = "Preferences", flag = "settings_ui", section = 'left' }))
+    local uiMgr, uiModule = settingsTab:create_module({ title = "UI Scale", description = "Adjust size", flag = "ui_scale_mod", section = 'left' })
+    if uiMgr then
+        uiMgr:add_slider({ text = "Scale", flag = "ui_scale", min = 0.75, max = 1.25, default = UI._config._library.ui_scale or 1, on_changed = function(v)
+            if UI._container and UI._container:FindFirstChildOfClass('UIScale') then
+                UI._container:FindFirstChildOfClass('UIScale').Scale = v
+            end
+            UI._config._library.ui_scale = v
+            Config:save_file('default', UI._config)
+        end })
+        uiMgr:add_toggle("Enable Parallax", "parallax_toggle", function(state)
+            UI._config._library.parallax_enabled = state
+            Config:save_file('default', UI._config)
+        end)
+        uiMgr:add_toggle("Enable Animations", "animations_toggle", function(state)
+            UI._config._library.animations_enabled = state
+            UI._animations_enabled = state
+            Config:save_file('default', UI._config)
+        end)
+        UI._config._flags.parallax_toggle = UI._config._library.parallax_enabled ~= false
+        UI._config._flags.animations_toggle = UI._config._library.animations_enabled ~= false
+    end
+    local prefMgr = select(1, settingsTab:create_module({ title = "Preferences", description = "Themes", flag = "pref_mod", section = 'right' }))
+    if prefMgr then
+        prefMgr:add_dropdown({ text = "Theme", flag = "theme", items = {"DarkAmber","NeonPurple","CyberBlue","Midnight","CleanWhite"}, default = UI._current_theme_name, on_changed = function(name) UI:set_theme(name) end })
+        prefMgr:add_dropdown({ text = "Sound Theme", flag = "sound_theme", items = {"Off","Soft","Clicky","Retro"}, default = UI._sound_theme, on_changed = function(name)
+            UI._sound_theme = name
+            UI._config._library.sound_theme = name
+            Config:save_file('default', UI._config)
+        end })
+        prefMgr:add_dropdown({ text = "Command Palette", flag = "palette", items = {"Enabled","Disabled"}, default = UI._config._library.enable_command_palette and "Enabled" or "Disabled", on_changed = function(val)
+            UI._config._library.enable_command_palette = val == "Enabled"
+            Config:save_file('default', UI._config)
+        end })
+    end
+end
+
+do
+    local appTab = UI:create_tab("Appearance", "")
+    local appMgr = select(1, appTab:create_module({ title = "Visuals", description = "Customize", flag = "appearance_mod", section = 'left' }))
+    if appMgr then
+        appMgr:add_colorpicker({ text = "Accent", flag = "accent_override", default = UI._current_theme.AccentColor, on_changed = function(col)
+            UI._config._library.appearance = UI._config._library.appearance or {}
+            UI._config._library.appearance.accent_override = Util.color_to_table(col)
+            Config:save_file('default', UI._config)
+            UI:apply_theme_to_existing_ui()
+        end })
+        appMgr:add_slider({ text = "Container Transparency", flag = "container_transparency", min = 0, max = 0.5, default = UI._config._library.appearance.container_transparency or 0.06, on_changed = function(v)
+            UI._config._library.appearance.container_transparency = v
+            if UI._container then UI._container.BackgroundTransparency = v end
+            Config:save_file('default', UI._config)
+        end })
+        appMgr:add_slider({ text = "Blur Strength", flag = "blur_strength", min = 0, max = 1, default = UI._config._library.blur_strength or 0.7, on_changed = function(v)
+            UI._config._library.blur_strength = v
+            if UI._blur and UI._blur.render then pcall(function() UI._blur:render(v) end) end
+            Config:save_file('default', UI._config)
+        end })
+        appMgr:add_toggle("Glassmorphism", "glass_toggle")
+    end
+end
+
+do
+    local consoleTab = UI:create_tab("Console", "")
+    local consoleMgr, consoleFrame = consoleTab:create_module({ title = "Logs", description = "Activity", flag = "logs", section = 'left' })
+    if consoleMgr then
+        local logFrame = Instance.new('ScrollingFrame', consoleFrame)
+        logFrame.Size = UDim2.new(1,-10,0,150)
+        logFrame.Position = UDim2.new(0,5,0,40)
+        logFrame.BackgroundTransparency = 0.9
+        logFrame.ScrollBarThickness = 4
+        local layout = Instance.new('UIListLayout', logFrame); layout.SortOrder = Enum.SortOrder.LayoutOrder; layout.Padding = UDim.new(0,4)
+        UI._console_output = function(filter)
+            for _, child in ipairs(logFrame:GetChildren()) do
+                if child:IsA('TextLabel') then child:Destroy() end
+            end
+            local active = filter or UI._console_filter or 'all'
+            for _, entry in ipairs(UI._log_entries) do
+                if active == 'all' or entry.type == active then
+                    local lbl = Instance.new('TextLabel', logFrame)
+                    lbl.BackgroundTransparency = 1
+                    lbl.TextXAlignment = Enum.TextXAlignment.Left
+                    lbl.TextSize = 12
+                    lbl.Font = Enum.Font.Gotham
+                    lbl.TextColor3 = UI._current_theme.TextPrimary
+                    lbl.Size = UDim2.new(1,-4,0,18)
+                    lbl.Text = string.format('[%s][%s] %s', os.date('%H:%M:%S', entry.timestamp), entry.type, entry.text)
+                end
+            end
+        end
+        UI._console_output('all')
+        local filters = {'all','info','warn','error'}
+        for i, f in ipairs(filters) do
+            local btn = UI:create_button(consoleFrame, string.upper(f), function()
+                UI._console_filter = f
+                UI._console_output(f)
+            end)
+            if btn then btn.Position = UDim2.new(0, (i-1)*60,0,8) end
+        end
+        UI:create_button(consoleFrame, "Clear", function()
+            UI._log_entries = {}
+            UI._console_output('all')
+        end)
+    end
 end
 
 do

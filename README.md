@@ -21,3 +21,19 @@ This repository contains an expanded Roblox exploit UI script (`script.lua`) tha
 
 ## Usage
 Load `script.lua` inside a Roblox exploit environment that exposes functions such as `cloneref`, `writefile`, `readfile`, `isfolder`, `listfiles`, and `delfile`. The script automatically creates and shows the UI, loads the default config if present, and exposes a `CLICK_UI` global for other scripts to reuse the interface and config helpers.
+
+### Quick loader
+
+If you are hosting this repo at `https://github.com/Ninnyyy/myscript.lua.git`, you can drop the one-liner below into your executor to fetch and run the current build directly:
+
+```lua
+loadstring(game:HttpGet("https://raw.githubusercontent.com/Ninnyyy/myscript.lua/main/script.lua"))()
+```
+
+Alternatively, save `script.lua` to your auto-exec folder and run it locally with:
+
+```lua
+loadstring(readfile("script.lua"))()
+```
+
+No additional bootstrapper or loader file is required—the script self-initializes when executed.
