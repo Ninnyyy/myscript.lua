@@ -97,6 +97,16 @@ if not isfolder(BACKUP_FOLDER) then
     makefolder(BACKUP_FOLDER)
 end
 
+local BACKUP_FOLDER = "click/backups"
+if not isfolder(BACKUP_FOLDER) then
+    makefolder(BACKUP_FOLDER)
+end
+
+local BACKUP_FOLDER = "click/backups"
+if not isfolder(BACKUP_FOLDER) then
+    makefolder(BACKUP_FOLDER)
+end
+
 -- remove old UI if present
 local old_click = CoreGui:FindFirstChild('click')
 if old_click then
@@ -635,6 +645,36 @@ function Library:_attach_tooltip(instance, text)
     end)
 end
 
+function Library:_track_theme(instance, propMap)
+    if not instance then return end
+    table.insert(self._theme_targets, { instance = instance, props = propMap })
+end
+
+function Library:apply_theme_to_existing_ui()
+    local theme = self._current_theme or self._themes.DarkAmber
+    for _, target in ipairs(self._theme_targets) do
+        local inst = target.instance
+        if inst and inst.Parent then
+            local props = {}
+            for prop, key in pairs(target.props or {}) do
+                local value = theme[key] or target.default
+                props[prop] = value
+            end
+            Util.tween(inst, self._config._library.animations_enabled and 0.2 or 0, props)
+        end
+    end
+end
+
+function Library:set_theme(name)
+    if not self._themes[name] then return end
+    self._current_theme_name = name
+    self._current_theme = self._themes[name]
+    self._config._library.theme = name
+    Config:save_file('default', self._config)
+    self:apply_theme_to_existing_ui()
+    self:log('info', 'Theme set to '..tostring(name))
+end
+
 -- Notification system
 local NotificationContainer
 do
@@ -960,6 +1000,11 @@ function Library:create_ui()
         end
     end))
 
+    function self:log(log_type, text)
+        table.insert(self._log_entries, { type = log_type or 'info', text = tostring(text), timestamp = os.time() })
+        if self._console_output then pcall(self._console_output) end
+    end
+
     -- Tab creation
     function self:create_tab(title, icon)
         local Tab = Instance.new('TextButton', Tabs); Tab.Name='Tab'; Tab.Size=UDim2.new(0,129,0,38); Tab.BackgroundTransparency=1; Tab.AutoButtonColor=false
@@ -1132,6 +1177,19 @@ function Library:create_ui()
         for _, obj in pairs(Sections:GetChildren()) do
             obj.Visible = (obj == left_section or obj == right_section)
         end
+    end
+
+    -- parallax effect
+    local basePosition = Container.Position
+    if self._config._library.parallax_enabled ~= false then
+        Connections:add('parallax', UserInputService.InputChanged:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseMovement and self._ui.Enabled then
+                local viewport = workspace.CurrentCamera.ViewportSize
+                local offset = Vector2.new((input.Position.X - viewport.X/2) * self._parallax_strength, (input.Position.Y - viewport.Y/2) * self._parallax_strength)
+                Container.Position = basePosition + UDim2.new(0, offset.X, 0, offset.Y)
+                if Shadow then Shadow.Position = UDim2.new(0.5,4+offset.X,0.5,8+offset.Y) end
+            end
+        end))
     end
 
     -- parallax effect
