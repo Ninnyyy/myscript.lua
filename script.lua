@@ -52,6 +52,11 @@ if not isfolder(BACKUP_FOLDER) then
     makefolder(BACKUP_FOLDER)
 end
 
+local BACKUP_FOLDER = "click/backups"
+if not isfolder(BACKUP_FOLDER) then
+    makefolder(BACKUP_FOLDER)
+end
+
 -- remove old UI if present
 local old_click = CoreGui:FindFirstChild('click')
 if old_click then
@@ -98,6 +103,18 @@ function Util.shallow_copy(t)
     local r = {}
     for k,v in pairs(t) do r[k]=v end
     return r
+end
+function Util.tween(instance, time, props, easingStyle, easingDirection)
+    if not (instance and props) then return end
+    local style = easingStyle or Enum.EasingStyle.Quad
+    local dir = easingDirection or Enum.EasingDirection.Out
+    local tween
+    local ok, err = pcall(function()
+        tween = TweenService:Create(instance, TweenInfo.new(time or 0.25, style, dir), props)
+        tween:Play()
+    end)
+    if not ok then warn('[click][tween]', err) end
+    return tween
 end
 function Util.is_executor_supports_http()
     return (type(syn) == 'table') or (type(http_request) == 'function') or (type(request) == 'function')
@@ -344,16 +361,151 @@ end
 -- LIBRARY (main)
 local Library = {}
 Library.__index = Library
+Library._themes = {
+    DarkAmber = {
+        BackgroundColor = Color3.fromRGB(27,27,29),
+        AccentColor = Color3.fromRGB(153,68,0),
+        AccentColorSecondary = Color3.fromRGB(255,140,0),
+        TextPrimary = Color3.fromRGB(240, 232, 220),
+        TextSecondary = Color3.fromRGB(200, 170, 140),
+        BorderColor = Color3.fromRGB(40,40,42),
+        ShadowColor = Color3.fromRGB(0,0,0),
+        ButtonIdle = Color3.fromRGB(60,60,62),
+        ButtonHover = Color3.fromRGB(80,70,65),
+        ButtonPressed = Color3.fromRGB(50,40,35),
+        ModuleBackground = Color3.fromRGB(34,34,36),
+        ToggleOn = Color3.fromRGB(255,140,0),
+        ToggleOff = Color3.fromRGB(90,40,20),
+        NotificationBackground = Color3.fromRGB(28,28,30),
+        NotificationAccent = Color3.fromRGB(255,140,0),
+    },
+    NeonPurple = {
+        BackgroundColor = Color3.fromRGB(20,16,30),
+        AccentColor = Color3.fromRGB(180,110,255),
+        AccentColorSecondary = Color3.fromRGB(120,70,220),
+        TextPrimary = Color3.fromRGB(240, 230, 255),
+        TextSecondary = Color3.fromRGB(200, 180, 225),
+        BorderColor = Color3.fromRGB(70,50,120),
+        ShadowColor = Color3.fromRGB(10,6,20),
+        ButtonIdle = Color3.fromRGB(45,35,70),
+        ButtonHover = Color3.fromRGB(60,45,90),
+        ButtonPressed = Color3.fromRGB(35,25,60),
+        ModuleBackground = Color3.fromRGB(32,26,52),
+        ToggleOn = Color3.fromRGB(180,110,255),
+        ToggleOff = Color3.fromRGB(60,40,90),
+        NotificationBackground = Color3.fromRGB(26,20,42),
+        NotificationAccent = Color3.fromRGB(180,110,255),
+    },
+    CyberBlue = {
+        BackgroundColor = Color3.fromRGB(15,24,36),
+        AccentColor = Color3.fromRGB(70,170,255),
+        AccentColorSecondary = Color3.fromRGB(40,120,220),
+        TextPrimary = Color3.fromRGB(215, 235, 255),
+        TextSecondary = Color3.fromRGB(170, 200, 230),
+        BorderColor = Color3.fromRGB(40,80,120),
+        ShadowColor = Color3.fromRGB(0,10,20),
+        ButtonIdle = Color3.fromRGB(34,48,60),
+        ButtonHover = Color3.fromRGB(48,70,90),
+        ButtonPressed = Color3.fromRGB(30,42,54),
+        ModuleBackground = Color3.fromRGB(22,32,44),
+        ToggleOn = Color3.fromRGB(70,170,255),
+        ToggleOff = Color3.fromRGB(40,70,100),
+        NotificationBackground = Color3.fromRGB(18,26,38),
+        NotificationAccent = Color3.fromRGB(70,170,255),
+    },
+    Midnight = {
+        BackgroundColor = Color3.fromRGB(18,18,22),
+        AccentColor = Color3.fromRGB(120,140,180),
+        AccentColorSecondary = Color3.fromRGB(90,110,140),
+        TextPrimary = Color3.fromRGB(225, 230, 240),
+        TextSecondary = Color3.fromRGB(180, 190, 205),
+        BorderColor = Color3.fromRGB(50,50,60),
+        ShadowColor = Color3.fromRGB(0,0,0),
+        ButtonIdle = Color3.fromRGB(40,40,46),
+        ButtonHover = Color3.fromRGB(55,55,64),
+        ButtonPressed = Color3.fromRGB(32,32,38),
+        ModuleBackground = Color3.fromRGB(28,28,34),
+        ToggleOn = Color3.fromRGB(120,140,180),
+        ToggleOff = Color3.fromRGB(60,60,70),
+        NotificationBackground = Color3.fromRGB(20,20,26),
+        NotificationAccent = Color3.fromRGB(120,140,180),
+    },
+    CleanWhite = {
+        BackgroundColor = Color3.fromRGB(242,244,248),
+        AccentColor = Color3.fromRGB(60,120,220),
+        AccentColorSecondary = Color3.fromRGB(40,90,190),
+        TextPrimary = Color3.fromRGB(30,30,40),
+        TextSecondary = Color3.fromRGB(80,80,90),
+        BorderColor = Color3.fromRGB(210,215,220),
+        ShadowColor = Color3.fromRGB(0,0,0),
+        ButtonIdle = Color3.fromRGB(225,228,235),
+        ButtonHover = Color3.fromRGB(215,220,230),
+        ButtonPressed = Color3.fromRGB(200,205,215),
+        ModuleBackground = Color3.fromRGB(235,238,244),
+        ToggleOn = Color3.fromRGB(60,120,220),
+        ToggleOff = Color3.fromRGB(180,185,195),
+        NotificationBackground = Color3.fromRGB(240,242,246),
+        NotificationAccent = Color3.fromRGB(60,120,220),
+    }
+}
+Library._current_theme_name = 'DarkAmber'
+Library._current_theme = Library._themes.DarkAmber
 function Library.new()
     local self = setmetatable({
         _config = Config:read_file('default') or Config.default('default'),
         _ui = nil,
         _ui_loaded = false,
         _tab = 0,
-        _modules = {}
+        _modules = {},
+        _theme_targets = {},
+        _tab_badges = {},
+        _log_entries = {},
+        _commands = {},
+        _parallax_strength = 0.03,
+        _sound_theme = 'Off'
     }, Library)
+    self._config._library = self._config._library or {}
+    self._config._library.theme = self._config._library.theme or 'DarkAmber'
+    self._config._library.ui_scale = self._config._library.ui_scale or 1
+    self._config._library.blur_strength = self._config._library.blur_strength or 0.7
+    self._config._library.parallax_enabled = self._config._library.parallax_enabled ~= false
+    self._config._library.animations_enabled = self._config._library.animations_enabled ~= false
+    self._config._library.sound_theme = self._config._library.sound_theme or 'Off'
+    self._sound_theme = self._config._library.sound_theme
+    self._current_theme_name = self._config._library.theme
+    self._current_theme = self._themes[self._current_theme_name] or self._themes.DarkAmber
     self:create_ui()
     return self
+end
+
+function Library:_track_theme(instance, propMap)
+    if not instance then return end
+    table.insert(self._theme_targets, { instance = instance, props = propMap })
+end
+
+function Library:apply_theme_to_existing_ui()
+    local theme = self._current_theme or self._themes.DarkAmber
+    for _, target in ipairs(self._theme_targets) do
+        local inst = target.instance
+        if inst and inst.Parent then
+            local props = {}
+            for prop, key in pairs(target.props or {}) do
+                local value = theme[key] or target.default
+                props[prop] = value
+            end
+            Util.tween(inst, self._config._library.animations_enabled and 0.2 or 0, props)
+        end
+    end
+end
+
+function Library:set_theme(name)
+    if not self._themes[name] then return end
+    self._current_theme_name = name
+    self._current_theme = self._themes[name]
+    self._config._library.theme = name
+    Config:save_file('default', self._config)
+    self:apply_theme_to_existing_ui()
+    self:log('info', 'Theme set to '..tostring(name))
 end
 
 -- Notification system
@@ -378,71 +530,151 @@ end
 
 function Library.SendNotification(settings)
     settings = settings or {}
+    local theme = Library._current_theme or Library._themes.DarkAmber
     local Notification = Instance.new("Frame")
     Notification.Size = UDim2.new(1,0,0,60); Notification.BackgroundTransparency = 1; Notification.BorderSizePixel = 0
     Notification.Name = "Notification"; Notification.Parent = NotificationContainer; Notification.AutomaticSize = Enum.AutomaticSize.Y
 
     local Inner = Instance.new("Frame", Notification)
-    Inner.Size = UDim2.new(1,0,0,60); Inner.Position = UDim2.new(0,0,0,0); Inner.BackgroundColor3 = Color3.fromRGB(28,28,30)
+    Inner.Size = UDim2.new(1,0,0,60); Inner.Position = UDim2.new(0,0,0,0); Inner.BackgroundColor3 = theme.NotificationBackground
     Inner.BackgroundTransparency = 0.05; Inner.BorderSizePixel=0; Inner.Name = "InnerFrame"; Inner.AutomaticSize = Enum.AutomaticSize.Y
 
+    local accent = theme.NotificationAccent
+    local typ = settings.type or 'info'
+    local typeColors = {
+        success = Color3.fromRGB(60,190,120),
+        error = Color3.fromRGB(220,70,70),
+        warning = Color3.fromRGB(235,170,70),
+        info = accent
+    }
+    accent = typeColors[typ] or accent
+    local AccentBar = Instance.new('Frame', Inner)
+    AccentBar.Size = UDim2.new(0,4,1,0)
+    AccentBar.Position = UDim2.new(0,0,0,0)
+    AccentBar.BackgroundColor3 = accent
+    AccentBar.BorderSizePixel = 0
+
     local UICorner = Instance.new("UICorner", Inner); UICorner.CornerRadius = UDim.new(0,6)
-    local Title = Instance.new("TextLabel", Inner); Title.Text = settings.title or "Notification"; Title.TextSize=14; Title.Position=UDim2.new(0,8,0,6)
-    Title.Size = UDim2.new(1,-16,0,20); Title.BackgroundTransparency=1; Title.TextXAlignment = Enum.TextXAlignment.Left
-    local Body = Instance.new("TextLabel", Inner); Body.Text = settings.text or ""; Body.Position = UDim2.new(0,8,0,26)
-    Body.Size = UDim2.new(1,-16,0,30); Body.BackgroundTransparency=1; Body.TextSize=12; Body.TextXAlignment=Enum.TextXAlignment.Left; Body.TextYAlignment = Enum.TextYAlignment.Top
+    local Title = Instance.new("TextLabel", Inner); Title.Text = settings.title or "Notification"; Title.TextSize=14; Title.Position=UDim2.new(0,10,0,6)
+    Title.Size = UDim2.new(1,-16,0,20); Title.BackgroundTransparency=1; Title.TextXAlignment = Enum.TextXAlignment.Left; Title.TextColor3 = theme.TextPrimary
+    local Body = Instance.new("TextLabel", Inner); Body.Text = settings.text or ""; Body.Position = UDim2.new(0,10,0,26)
+    Body.Size = UDim2.new(1,-16,0,30); Body.BackgroundTransparency=1; Body.TextSize=12; Body.TextXAlignment=Enum.TextXAlignment.Left; Body.TextYAlignment = Enum.TextYAlignment.Top; Body.TextColor3 = theme.TextSecondary
+
+    local function destroy_now()
+        Util.tween(Inner, 0.3, {Position = UDim2.new(1,310,0,Inner.Position.Y.Offset + NotificationContainer.Size.Y.Offset)})
+        task.delay(0.32, function()
+            Notification:Destroy()
+        end)
+    end
+
+    Inner.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            if settings.on_click then pcall(settings.on_click) end
+            destroy_now()
+        end
+    end)
 
     task.spawn(function()
-        wait(0.1)
+        task.wait(0.1)
         local totalHeight = Title.TextBounds.Y + Body.TextBounds.Y + 18
         Inner.Size = UDim2.new(1,0,0,totalHeight)
     end)
     task.spawn(function()
-        local tweenIn = TweenService:Create(Inner, TweenInfo.new(0.45, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Position = UDim2.new(0,0,0,10 + NotificationContainer.Size.Y.Offset)})
-        tweenIn:Play()
-        local duration = settings.duration or 4
-        wait(duration)
-        local tweenOut = TweenService:Create(Inner, TweenInfo.new(0.45, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {Position = UDim2.new(1,310,0,10 + NotificationContainer.Size.Y.Offset)})
-        tweenOut:Play()
-        tweenOut.Completed:Connect(function() Notification:Destroy() end)
+        Util.tween(Inner, 0.35, {Position = UDim2.new(0,0,0,10 + NotificationContainer.Size.Y.Offset)}, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+        local duration = settings.sticky and math.huge or settings.duration or 4
+        task.wait(duration)
+        destroy_now()
     end)
+    SoundManager.play_event(Library._sound_theme, 'notify')
 end
 
 -- Basic sound manager (optional, uses sound instances)
-local SoundManager = {}
+local SoundManager = { _themes = {
+    Off = {},
+    Soft = {
+        toggle_on = "rbxassetid://4590657391", toggle_off = "rbxassetid://4590657391",
+        tab_switch = "rbxassetid://4590662769", button_click = "rbxassetid://4590657391", notify = "rbxassetid://4590657391"
+    },
+    Clicky = {
+        toggle_on = "rbxassetid://9118823101", toggle_off = "rbxassetid://9118823101",
+        tab_switch = "rbxassetid://9118823101", button_click = "rbxassetid://9118823101", notify = "rbxassetid://9118823101"
+    },
+    Retro = {
+        toggle_on = "rbxassetid://7149255557", toggle_off = "rbxassetid://7149255557",
+        tab_switch = "rbxassetid://7149255557", button_click = "rbxassetid://7149255557", notify = "rbxassetid://7149255557"
+    }
+}}
 function SoundManager.play(soundId, volume)
+    if not soundId or soundId == '' then return end
     volume = volume or 1
-    local s = Instance.new("Sound")
-    s.SoundId = soundId
-    s.Volume = volume
-    s.Parent = workspace
-    s.PlayOnRemove = false
-    s:Play()
-    Debris:AddItem(s, 3)
+    local ok, s = pcall(function()
+        local snd = Instance.new("Sound")
+        snd.SoundId = soundId
+        snd.Volume = volume
+        snd.Parent = workspace
+        snd.PlayOnRemove = false
+        snd:Play()
+        Debris:AddItem(snd, 3)
+        return snd
+    end)
+    if not ok then return end
+    return s
+end
+function SoundManager.play_event(theme_name, eventName)
+    local theme = SoundManager._themes[theme_name or 'Off']
+    if not theme then return end
+    local soundId = theme[eventName]
+    if not soundId then return end
+    SoundManager.play(soundId, 0.8)
 end
 
 -- UI creation (main screen)
 function Library:create_ui()
+    local theme = self._current_theme or self._themes.DarkAmber
     local click = Instance.new('ScreenGui')
     click.ResetOnSpawn = false
     click.Name = 'click'
     click.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     click.Parent = CoreGui
 
+    local Shadow = Instance.new('Frame', click)
+    Shadow.Name = 'Shadow'
+    Shadow.AnchorPoint = Vector2.new(0.5,0.5)
+    Shadow.Position = UDim2.new(0.5,4,0.5,8)
+    Shadow.Size = UDim2.fromOffset(710,491)
+    Shadow.BackgroundColor3 = theme.ShadowColor
+    Shadow.BackgroundTransparency = 0.7
+    Shadow.BorderSizePixel = 0
+    local shadowCorner = Instance.new('UICorner', Shadow); shadowCorner.CornerRadius = UDim.new(0,12)
+    self:_track_theme(Shadow, { BackgroundColor3 = 'ShadowColor' })
+
     local Container = Instance.new('Frame', click)
     Container.Name = 'Container'
     Container.Size = UDim2.fromOffset(0,0)
     Container.Position = UDim2.new(0.5,0,0.5,0)
     Container.AnchorPoint = Vector2.new(0.5,0.5)
-    Container.BackgroundColor3 = Color3.fromRGB(27,27,29)
+    Container.BackgroundColor3 = theme.BackgroundColor
     Container.BackgroundTransparency = 0.06
     Container.BorderSizePixel = 0
     Container.ClipsDescendants = true
 
     local UICorner = Instance.new("UICorner", Container); UICorner.CornerRadius = UDim.new(0,10)
-    local UIStroke = Instance.new("UIStroke", Container); UIStroke.Color = Color3.fromRGB(40,40,42); UIStroke.Transparency = 0.6
+    local UIStroke = Instance.new("UIStroke", Container); UIStroke.Color = theme.BorderColor; UIStroke.Transparency = 0.6
+    self:_track_theme(Container, { BackgroundColor3 = 'BackgroundColor' })
+    self:_track_theme(UIStroke, { Color = 'BorderColor' })
+
+    local UIScale = Instance.new('UIScale', Container)
+    UIScale.Scale = self._config._library.ui_scale or 1
+
+    local AcrylicStrength = self._config._library.blur_strength or 0.7
+    if AcrylicBlur and AcrylicBlur.new then
+        pcall(function()
+            self._blur = AcrylicBlur.new(Container, AcrylicStrength)
+        end)
+    end
 
     local Handler = Instance.new('Frame', Container); Handler.Name='Handler'; Handler.Size=UDim2.new(0,698,0,479); Handler.BackgroundTransparency=1
+    self:_track_theme(Handler, { BackgroundColor3 = 'BackgroundColor' })
 
     -- Left tabs
     local Tabs = Instance.new('ScrollingFrame', Handler); Tabs.Name='Tabs'
@@ -453,7 +685,8 @@ function Library:create_ui()
     local ClientName = Instance.new('TextLabel', Handler)
     ClientName.Name='ClientName'; ClientName.Size=UDim2.new(0,150,0,20); ClientName.Position=UDim2.new(0.056,0,0.055,0)
     ClientName.BackgroundTransparency=1; ClientName.TextXAlignment=Enum.TextXAlignment.Left; ClientName.TextSize=13
-    ClientName.Font = Enum.Font.GothamSemibold; ClientName.TextColor3 = Color3.fromRGB(153,68,0)
+    ClientName.Font = Enum.Font.GothamSemibold; ClientName.TextColor3 = theme.AccentColor
+    self:_track_theme(ClientName, { TextColor3 = 'AccentColor' })
     local spinChars = {"/","-","\\","|"}; local i=1
     task.spawn(function()
         while click.Parent do
@@ -467,7 +700,8 @@ function Library:create_ui()
 
     -- Divider & Sections
     local Divider = Instance.new('Frame', Handler); Divider.Name='Divider'; Divider.Size=UDim2.new(0,1,0,479); Divider.Position=UDim2.new(0.235,0,0,0)
-    Divider.BackgroundColor3 = Color3.fromRGB(128,51,0); Divider.BackgroundTransparency = 0.4; Divider.BorderSizePixel = 0
+    Divider.BackgroundColor3 = theme.AccentColor; Divider.BackgroundTransparency = 0.4; Divider.BorderSizePixel = 0
+    self:_track_theme(Divider, { BackgroundColor3 = 'AccentColor' })
     local Sections = Instance.new('Folder', Handler); Sections.Name='Sections'
 
     -- Minimize button
@@ -481,7 +715,6 @@ function Library:create_ui()
         end
     end)
 
-    local UIScale = Instance.new('UIScale', Container)
     self._ui = click
     self._container = Container
     self._tabs = Tabs
@@ -512,6 +745,7 @@ function Library:create_ui()
 
     -- load routine (preload images, scale on mobile, open animation)
     function self:load()
+        self:set_theme(self._config._library.theme or 'DarkAmber')
         self:get_device()
         if self._device == 'Mobile' or self._device == 'Unknown' then
             self:get_screen_scale()
@@ -540,13 +774,19 @@ function Library:create_ui()
         self._ui_scale = vx / 1400
     end
 
+    function self:log(log_type, text)
+        table.insert(self._log_entries, { type = log_type or 'info', text = tostring(text), timestamp = os.time() })
+        if self._console_output then pcall(self._console_output) end
+    end
+
     -- Tab creation
     function self:create_tab(title, icon)
         local Tab = Instance.new('TextButton', Tabs); Tab.Name='Tab'; Tab.Size=UDim2.new(0,129,0,38); Tab.BackgroundTransparency=1; Tab.AutoButtonColor=false
         Tab.LayoutOrder = self._tab or 0
         local TextLabel = Instance.new('TextLabel', Tab); TextLabel.Size=UDim2.new(0,90,0,16); TextLabel.Position=UDim2.new(0.24,0,0.5,0)
-        TextLabel.BackgroundTransparency=1; TextLabel.Text = title; TextLabel.TextXAlignment = Enum.TextXAlignment.Left; TextLabel.TextSize=13; TextLabel.Font = Enum.Font.GothamSemibold; TextLabel.TextColor3=Color3.fromRGB(255,255,255); TextLabel.TextTransparency=0.7
+        TextLabel.BackgroundTransparency=1; TextLabel.Text = title; TextLabel.TextXAlignment = Enum.TextXAlignment.Left; TextLabel.TextSize=13; TextLabel.Font = Enum.Font.GothamSemibold; TextLabel.TextColor3=self._current_theme.TextPrimary; TextLabel.TextTransparency=0.7
         local Icon = Instance.new('ImageLabel', Tab); Icon.Name='Icon'; Icon.Size=UDim2.new(0,16,0,16); Icon.Position=UDim2.new(0.1,0,0.5,0); Icon.AnchorPoint=Vector2.new(0,0.5); Icon.BackgroundTransparency=1; Icon.Image=icon; Icon.ImageTransparency=0.8
+        self:_track_theme(TextLabel, { TextColor3 = 'TextPrimary' })
 
         local LeftSection = Instance.new('ScrollingFrame', Sections); LeftSection.Name='LeftSection'; LeftSection.Size=UDim2.new(0,243,0,445); LeftSection.Position = UDim2.new(0.259,0,0.5,0); LeftSection.BackgroundTransparency=1; LeftSection.Visible=false
         local RightSection = Instance.new('ScrollingFrame', Sections); RightSection.Name='RightSection'; RightSection.Size=UDim2.new(0,243,0,445); RightSection.Position=UDim2.new(0.629,0,0.5,0); RightSection.BackgroundTransparency=1; RightSection.Visible=false
@@ -583,20 +823,27 @@ function Library:create_ui()
         function TabManager:create_module(settings)
             settings = settings or {}
             settings.section = settings.section == 'right' and RightSection or LeftSection
-            local Module = Instance.new('Frame', settings.section); Module.Name='Module'; Module.Size=UDim2.new(0,241,0,93); Module.BackgroundTransparency=0.2; Module.BackgroundColor3 = Color3.fromRGB(34,34,36)
+            local Module = Instance.new('Frame', settings.section); Module.Name='Module'; Module.Size=UDim2.new(0,241,0,93); Module.BackgroundTransparency=0.2; Module.BackgroundColor3 = self._current_theme.ModuleBackground
             Module.ClipsDescendants = true; Module.BorderSizePixel = 0
             local UICorner = Instance.new('UICorner', Module); UICorner.CornerRadius = UDim.new(0,5)
-            local UIStroke = Instance.new('UIStroke', Module); UIStroke.Color = Color3.fromRGB(70,40,20); UIStroke.Transparency = 0.6
+            local UIStroke = Instance.new('UIStroke', Module); UIStroke.Color = self._current_theme.BorderColor; UIStroke.Transparency = 0.6
+            self:_track_theme(Module, { BackgroundColor3 = 'ModuleBackground' })
+            self:_track_theme(UIStroke, { Color = 'BorderColor' })
 
             local Header = Instance.new('TextButton', Module); Header.Size=UDim2.new(1,0,1,0); Header.BackgroundTransparency=1; Header.AutoButtonColor=false
             local Icon = Instance.new('ImageLabel', Header); Icon.Size=UDim2.new(0,15,0,15); Icon.Position=UDim2.new(0.07,0,0.82,0); Icon.AnchorPoint=Vector2.new(0,0.5); Icon.BackgroundTransparency=1; Icon.Image = settings.icon or ''
-            local ModuleName = Instance.new('TextLabel', Header); ModuleName.Text = settings.title or "Module"; ModuleName.Position = UDim2.new(0.073,0,0.24,0); ModuleName.TextSize=13; ModuleName.Font=Enum.Font.GothamSemibold; ModuleName.TextColor3=Color3.fromRGB(153,68,0); ModuleName.BackgroundTransparency=1
-            local Desc = Instance.new('TextLabel', Header); Desc.Text = settings.description or ""; Desc.TextSize=10; Desc.Position=UDim2.new(0.073,0,0.42,0); Desc.BackgroundTransparency=1; Desc.TextColor3 = Color3.fromRGB(160,80,40)
-            local Toggle = Instance.new('Frame', Header); Toggle.Size=UDim2.new(0,25,0,12); Toggle.Position=UDim2.new(0.82,0,0.757,0); Toggle.BackgroundColor3=Color3.fromRGB(90,40,20); Toggle.BackgroundTransparency=0.7
+            local ModuleName = Instance.new('TextLabel', Header); ModuleName.Text = settings.title or "Module"; ModuleName.Position = UDim2.new(0.073,0,0.24,0); ModuleName.TextSize=13; ModuleName.Font=Enum.Font.GothamSemibold; ModuleName.TextColor3=self._current_theme.AccentColor; ModuleName.BackgroundTransparency=1
+            local Desc = Instance.new('TextLabel', Header); Desc.Text = settings.description or ""; Desc.TextSize=10; Desc.Position=UDim2.new(0.073,0,0.42,0); Desc.BackgroundTransparency=1; Desc.TextColor3 = self._current_theme.TextSecondary
+            local Toggle = Instance.new('Frame', Header); Toggle.Size=UDim2.new(0,25,0,12); Toggle.Position=UDim2.new(0.82,0,0.757,0); Toggle.BackgroundColor3=self._current_theme.ToggleOff; Toggle.BackgroundTransparency=0.7
             local TC = Instance.new('UICorner', Toggle); TC.CornerRadius = UDim.new(1,0)
-            local Circle = Instance.new('Frame', Toggle); Circle.Size=UDim2.new(0,12,0,12); Circle.Position=UDim2.new(0,0,0.5,0); Circle.AnchorPoint=Vector2.new(0,0.5); Circle.BackgroundColor3=Color3.fromRGB(90,40,20); local CC = Instance.new('UICorner', Circle); CC.CornerRadius = UDim.new(1,0)
-            local Keybind = Instance.new('Frame', Header); Keybind.Size=UDim2.new(0,33,0,15); Keybind.Position=UDim2.new(0.15,0,0.735,0); Keybind.BackgroundTransparency=0.7; Keybind.BackgroundColor3=Color3.fromRGB(153,68,0)
+            local Circle = Instance.new('Frame', Toggle); Circle.Size=UDim2.new(0,12,0,12); Circle.Position=UDim2.new(0,0,0.5,0); Circle.AnchorPoint=Vector2.new(0,0.5); Circle.BackgroundColor3=self._current_theme.ToggleOff; local CC = Instance.new('UICorner', Circle); CC.CornerRadius = UDim.new(1,0)
+            local Keybind = Instance.new('Frame', Header); Keybind.Size=UDim2.new(0,33,0,15); Keybind.Position=UDim2.new(0.15,0,0.735,0); Keybind.BackgroundTransparency=0.7; Keybind.BackgroundColor3=self._current_theme.AccentColor
             local KeybindLabel = Instance.new('TextLabel', Keybind); KeybindLabel.Size=UDim2.new(0,25,0,13); KeybindLabel.Position=UDim2.new(0.5,0,0.5,0); KeybindLabel.AnchorPoint=Vector2.new(0.5,0.5); KeybindLabel.Text='None'; KeybindLabel.BackgroundTransparency=1; KeybindLabel.TextSize=10
+            self:_track_theme(ModuleName, { TextColor3 = 'AccentColor' })
+            self:_track_theme(Desc, { TextColor3 = 'TextSecondary' })
+            self:_track_theme(Toggle, { BackgroundColor3 = 'ToggleOff' })
+            self:_track_theme(Circle, { BackgroundColor3 = 'ToggleOff' })
+            self:_track_theme(Keybind, { BackgroundColor3 = 'AccentColor' })
 
             local Options = Instance.new('Frame', Module); Options.Position = UDim2.new(0,0,1,0); Options.Size=UDim2.new(0,241,0,8); Options.BackgroundTransparency=1
             local OptionsLayout = Instance.new('UIListLayout', Options); OptionsLayout.Padding = UDim.new(0,5); OptionsLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
@@ -607,12 +854,14 @@ function Library:create_ui()
                 manager._state = state
                 if state then
                     TweenService:Create(Module, TweenInfo.new(0.45), {Size=UDim2.fromOffset(241,93 + manager._size + manager._mult)}):Play()
-                    TweenService:Create(Toggle, TweenInfo.new(0.45), {BackgroundColor3 = Color3.fromRGB(153,68,0)}):Play()
-                    TweenService:Create(Circle, TweenInfo.new(0.45), {Position = UDim2.fromScale(0.53,0.5), BackgroundColor3 = Color3.fromRGB(255,140,0)}):Play()
+                    TweenService:Create(Toggle, TweenInfo.new(0.45), {BackgroundColor3 = Library._current_theme.ToggleOn}):Play()
+                    TweenService:Create(Circle, TweenInfo.new(0.45), {Position = UDim2.fromScale(0.53,0.5), BackgroundColor3 = Library._current_theme.ToggleOn}):Play()
+                    SoundManager.play_event(Library._sound_theme, 'toggle_on')
                 else
                     TweenService:Create(Module, TweenInfo.new(0.45), {Size=UDim2.fromOffset(241,93)}):Play()
-                    TweenService:Create(Toggle, TweenInfo.new(0.45), {BackgroundColor3 = Color3.fromRGB(90,40,20)}):Play()
-                    TweenService:Create(Circle, TweenInfo.new(0.45), {Position = UDim2.fromScale(0,0.5), BackgroundColor3 = Color3.fromRGB(90,40,20)}):Play()
+                    TweenService:Create(Toggle, TweenInfo.new(0.45), {BackgroundColor3 = Library._current_theme.ToggleOff}):Play()
+                    TweenService:Create(Circle, TweenInfo.new(0.45), {Position = UDim2.fromScale(0,0.5), BackgroundColor3 = Library._current_theme.ToggleOff}):Play()
+                    SoundManager.play_event(Library._sound_theme, 'toggle_off')
                 end
                 self._state = manager._state
                 -- persist
@@ -674,15 +923,15 @@ function Library:create_ui()
                 local tcorner = Instance.new('UICorner', toggleFrame)
                 local tcircle = Instance.new('Frame', toggleFrame); tcircle.Size=UDim2.new(0,16,0,16); tcircle.Position=UDim2.new(0,0.5,0,0); tcircle.AnchorPoint=Vector2.new(0,0.5); local tcc = Instance.new('UICorner', tcircle); tcc.CornerRadius=UDim.new(1,0)
                 local state = Library._config._flags[flag] or false
-                if state then tcircle.Position = UDim2.fromScale(0.75,0.5); tcircle.BackgroundColor3 = Color3.fromRGB(255,140,0) end
+                if state then tcircle.Position = UDim2.fromScale(0.75,0.5); tcircle.BackgroundColor3 = Library._current_theme.ToggleOn end
                 row.MouseButton1Click = nil -- safe
                 row.InputBegan:Connect(function(inp)
                     if inp.UserInputType == Enum.UserInputType.MouseButton1 then
                         state = not state
                         Library._config._flags[flag] = state
                         Config:save_file('default', Library._config)
-                        if state then TweenService:Create(tcircle, TweenInfo.new(0.2), {Position=UDim2.fromScale(0.75,0.5)}):Play(); tcircle.BackgroundColor3=Color3.fromRGB(255,140,0)
-                        else TweenService:Create(tcircle, TweenInfo.new(0.2), {Position=UDim2.fromScale(0,0.5)}):Play(); tcircle.BackgroundColor3=Color3.fromRGB(90,40,20) end
+                        if state then TweenService:Create(tcircle, TweenInfo.new(0.2), {Position=UDim2.fromScale(0.75,0.5)}):Play(); tcircle.BackgroundColor3=Library._current_theme.ToggleOn
+                        else TweenService:Create(tcircle, TweenInfo.new(0.2), {Position=UDim2.fromScale(0,0.5)}):Play(); tcircle.BackgroundColor3=Library._current_theme.ToggleOff end
                         if settings.onToggle then pcall(settings.onToggle, state) end
                     end
                 end)
@@ -704,13 +953,26 @@ function Library:create_ui()
         end
     end
 
+    -- parallax effect
+    local basePosition = Container.Position
+    if self._config._library.parallax_enabled ~= false then
+        Connections:add('parallax', UserInputService.InputChanged:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseMovement and self._ui.Enabled then
+                local viewport = workspace.CurrentCamera.ViewportSize
+                local offset = Vector2.new((input.Position.X - viewport.X/2) * self._parallax_strength, (input.Position.Y - viewport.Y/2) * self._parallax_strength)
+                Container.Position = basePosition + UDim2.new(0, offset.X, 0, offset.Y)
+                if Shadow then Shadow.Position = UDim2.new(0.5,4+offset.X,0.5,8+offset.Y) end
+            end
+        end))
+    end
+
     -- utility: create bare button in a section
     function self:create_button(section, text, callback)
         local btn = Instance.new('TextButton', section); btn.Size=UDim2.new(0,220,0,32); btn.BackgroundColor3 = Color3.fromRGB(60,60,62); btn.AutoButtonColor=false; btn.Text = text; btn.TextSize = 13
         local corner = Instance.new('UICorner', btn)
         btn.MouseButton1Click:Connect(function()
             pcall(callback)
-            SoundManager.play("rbxassetid://12222125", 0.8) -- placeholder sound
+            SoundManager.play_event(self._sound_theme, 'button_click')
         end)
         return btn
     end
