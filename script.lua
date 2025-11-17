@@ -43,9 +43,13 @@ local Debris = cloneref(game:GetService('Debris'))
 local LocalPlayer = Players.LocalPlayer
 local mouse = LocalPlayer:GetMouse()
 
--- ensure click folder for configs
 if not isfolder("click") then
     makefolder("click")
+end
+
+local BACKUP_FOLDER = "click/backups"
+if not isfolder(BACKUP_FOLDER) then
+    makefolder(BACKUP_FOLDER)
 end
 
 -- remove old UI if present
@@ -200,9 +204,40 @@ function AcrylicBlur:check_quality_level()
 end
 function AcrylicBlur:change_visibility(state) if self._root then self._root.Transparency = state and 0.98 or 1 end end
 
--- CONFIG manager with multi-config & autosave
 local Config = {}
-function Config:save_file(file_name, data)
+function Config.default(name)
+    local now = os.time()
+    return {
+        _flags = {},
+        _keybinds = {},
+        _library = {},
+        ui = {},
+        meta = { name = name or 'default', created_at = now, updated_at = now }
+    }
+end
+function Config:normalize(data, name, opts)
+    data = data or {}
+    opts = opts or {}
+    data._flags = data._flags or {}
+    data._keybinds = data._keybinds or {}
+    data._library = data._library or {}
+    data.ui = data.ui or {}
+    data.meta = data.meta or {}
+    data.meta.name = name or data.meta.name or 'default'
+    data.meta.created_at = data.meta.created_at or os.time()
+    if opts.touch_time == false then
+        data.meta.updated_at = data.meta.updated_at or os.time()
+    else
+        data.meta.updated_at = os.time()
+    end
+    return data
+end
+function Config:save_file(file_name, data, opts)
+    opts = opts or {}
+    data = self:normalize(data, file_name, { touch_time = opts.touch_time })
+    if opts.skip_backup ~= true then
+        self:backup_file(file_name, opts.max_backups)
+    end
     local ok, err = pcall(function()
         writefile('click/'..file_name..'.json', HttpService:JSONEncode(data))
     end)
@@ -213,7 +248,7 @@ function Config:read_file(file_name)
         if not isfile('click/'..file_name..'.json') then return nil end
         local s = readfile('click/'..file_name..'.json')
         if not s then return nil end
-        return HttpService:JSONDecode(s)
+        return self:normalize(HttpService:JSONDecode(s), file_name, { touch_time = false })
     end)
     if not ok then warn('[click] read failed:', res) return nil end
     return res
@@ -226,13 +261,92 @@ function Config:list_configs()
     end
     return results
 end
+function Config:delete_file(file_name)
+    local path = 'click/'..file_name..'.json'
+    if not isfile(path) then return false end
+    local ok, err = pcall(function()
+        delfile(path)
+    end)
+    if not ok then warn('[click] delete failed:', err) return false end
+    return true
+end
+function Config:clone_file(source_name, target_name)
+    if not source_name or not target_name then return false, 'missing name' end
+    local data = self:read_file(source_name)
+    if not data then return false, 'missing source' end
+    self:save_file(target_name, data)
+    return true
+end
+function Config:rename_file(source_name, target_name)
+    local ok, err = self:clone_file(source_name, target_name)
+    if not ok then return ok, err end
+    self:delete_file(source_name)
+    return true
+end
+function Config:list_backups(file_name)
+    local results = {}
+    for _, file in pairs(listfiles(BACKUP_FOLDER)) do
+        local name, ts = file:match("click/backups/(.+)%.(%d+)%.json")
+        if name and ts and name == file_name then
+            table.insert(results, { name = name, timestamp = tonumber(ts), path = file })
+        end
+    end
+    table.sort(results, function(a, b)
+        return (a.timestamp or 0) > (b.timestamp or 0)
+    end)
+    return results
+end
+function Config:prune_backups(file_name, max_backups)
+    max_backups = max_backups or 5
+    if max_backups <= 0 then return end
+    local backups = self:list_backups(file_name)
+    if #backups <= max_backups then return end
+    for i = max_backups + 1, #backups do
+        pcall(function() delfile(backups[i].path) end)
+    end
+end
+function Config:backup_file(file_name, max_backups)
+    local path = 'click/'..file_name..'.json'
+    if not isfile(path) then return false, 'missing source' end
+    local data = self:read_file(file_name)
+    if not data then return false, 'missing data' end
+    local stamp = os.time()
+    local backup_path = string.format("%s/%s.%d.json", BACKUP_FOLDER, file_name, stamp)
+    local ok, err = pcall(function()
+        writefile(backup_path, HttpService:JSONEncode(data))
+    end)
+    if not ok then warn('[click] backup failed:', err) return false, err end
+    self:prune_backups(file_name, max_backups)
+    return true, backup_path, stamp
+end
+function Config:restore_backup(file_name, timestamp)
+    local backups = self:list_backups(file_name)
+    if #backups == 0 then return false, 'no backups' end
+    local target = backups[1]
+    if timestamp then
+        for _, b in ipairs(backups) do
+            if tostring(b.timestamp) == tostring(timestamp) then
+                target = b
+                break
+            end
+        end
+    end
+    local ok, decoded = pcall(function()
+        local raw = readfile(target.path)
+        return HttpService:JSONDecode(raw)
+    end)
+    if not ok or not decoded then return false, 'bad backup' end
+    local normalized = self:normalize(decoded, file_name, { touch_time = false })
+    self:save_file(file_name, normalized, { skip_backup = true, touch_time = false })
+    return true, target.timestamp
+end
 
 -- LIBRARY (main)
 local Library = {}
 Library.__index = Library
 function Library.new()
     local self = setmetatable({
-        _config = Config:read_file('default') or { _flags = {}, _keybinds = {}, _library = {}, ui = {} },
+        _config = Config:read_file('default') or Config.default('default'),
         _ui = nil,
         _ui_loaded = false,
         _tab = 0,
@@ -650,7 +764,15 @@ end
 getgenv().CLICK_UI = {
     library = UI,
     send_notification = Library.SendNotification,
-    save_config = function(name) Config:save_file(name or 'default', UI._config) end,
+    save_config = function(name)
+        Config:save_file(name or 'default', UI._config)
+    end,
+    save_config_as = function(name)
+        if not name or name == '' then return false, 'missing name' end
+        Config:save_file(name, UI._config)
+        Library.SendNotification({ title = "Config", text = "Saved as "..name })
+        return true
+    end,
     load_config = function(name)
         local data = Config:read_file(name or 'default')
         if data then UI._config = data; Library.SendNotification({ title="Config", text="Loaded "..(name or 'default') }) end
@@ -660,11 +782,72 @@ getgenv().CLICK_UI = {
         if not data then return nil end
         return HttpService:JSONEncode(data)
     end,
+    get_config_metadata = function(name)
+        local data = Config:read_file(name or 'default')
+        return data and data.meta or nil
+    end,
+    list_configs = function()
+        return Config:list_configs()
+    end,
+    delete_config = function(name)
+        local target = name or 'default'
+        local ok = Config:delete_file(target)
+        if ok then
+            Library.SendNotification({ title = "Config", text = "Deleted "..target })
+        else
+            Library.SendNotification({ title = "Config", text = "Unable to delete "..target })
+        end
+        return ok
+    end,
+    rename_config = function(source, target)
+        local from = source or 'default'
+        local to = target or 'default'
+        local ok, err = Config:rename_file(from, to)
+        if ok then
+            if UI._config.meta and UI._config.meta.name == from then
+                UI._config.meta.name = to
+            end
+            Library.SendNotification({ title = "Config", text = string.format("Renamed %s to %s", from, to) })
+        else
+            Library.SendNotification({ title = "Config", text = "Rename failed: "..(err or "") })
+        end
+        return ok
+    end,
+    reset_default_config = function()
+        UI._config = Config.default('default')
+        Config:save_file('default', UI._config)
+        Library.SendNotification({ title = "Config", text = "Reset default configuration" })
+        return UI._config
+    end,
+    backup_config = function(name, max_backups)
+        local target = name or 'default'
+        local ok, path_or_err, stamp = Config:backup_file(target, max_backups)
+        if ok then
+            Library.SendNotification({ title = "Config", text = string.format("Backed up %s (%d)", target, stamp or 0) })
+        else
+            Library.SendNotification({ title = "Config", text = "Backup failed: "..(path_or_err or "") })
+        end
+        return ok, path_or_err, stamp
+    end,
+    list_backups = function(name)
+        return Config:list_backups(name or 'default')
+    end,
+    restore_backup = function(name, timestamp)
+        local target = name or 'default'
+        local ok, info = Config:restore_backup(target, timestamp)
+        if ok then
+            Library.SendNotification({ title = "Config", text = string.format("Restored %s from backup", target) })
+        else
+            Library.SendNotification({ title = "Config", text = "Restore failed: "..(info or "") })
+        end
+        return ok, info
+    end,
     import_config_raw = function(json_raw)
         local ok, tbl = pcall(function() return HttpService:JSONDecode(json_raw) end)
         if not ok then return false, "invalid json" end
-        Config:save_file('default', tbl)
-        UI._config = tbl
+        local normalized = Config:normalize(tbl, 'default')
+        Config:save_file('default', normalized)
+        UI._config = normalized
         return true
     end,
     open_ui = function() UI:show() end,
