@@ -200,8 +200,10 @@ function AcrylicBlur:check_quality_level()
 end
 function AcrylicBlur:change_visibility(state) if self._root then self._root.Transparency = state and 0.98 or 1 end end
 
--- CONFIG manager with multi-config & autosave
 local Config = {}
+function Config.default()
+    return { _flags = {}, _keybinds = {}, _library = {}, ui = {} }
+end
 function Config:save_file(file_name, data)
     local ok, err = pcall(function()
         writefile('click/'..file_name..'.json', HttpService:JSONEncode(data))
@@ -226,13 +228,22 @@ function Config:list_configs()
     end
     return results
 end
+function Config:delete_file(file_name)
+    local path = 'click/'..file_name..'.json'
+    if not isfile(path) then return false end
+    local ok, err = pcall(function()
+        delfile(path)
+    end)
+    if not ok then warn('[click] delete failed:', err) return false end
+    return true
+end
 
 -- LIBRARY (main)
 local Library = {}
 Library.__index = Library
 function Library.new()
     local self = setmetatable({
-        _config = Config:read_file('default') or { _flags = {}, _keybinds = {}, _library = {}, ui = {} },
+        _config = Config:read_file('default') or Config.default(),
         _ui = nil,
         _ui_loaded = false,
         _tab = 0,
@@ -659,6 +670,25 @@ getgenv().CLICK_UI = {
         local data = Config:read_file(name or 'default')
         if not data then return nil end
         return HttpService:JSONEncode(data)
+    end,
+    list_configs = function()
+        return Config:list_configs()
+    end,
+    delete_config = function(name)
+        local target = name or 'default'
+        local ok = Config:delete_file(target)
+        if ok then
+            Library.SendNotification({ title = "Config", text = "Deleted "..target })
+        else
+            Library.SendNotification({ title = "Config", text = "Unable to delete "..target })
+        end
+        return ok
+    end,
+    reset_default_config = function()
+        UI._config = Config.default()
+        Config:save_file('default', UI._config)
+        Library.SendNotification({ title = "Config", text = "Reset default configuration" })
+        return UI._config
     end,
     import_config_raw = function(json_raw)
         local ok, tbl = pcall(function() return HttpService:JSONDecode(json_raw) end)
