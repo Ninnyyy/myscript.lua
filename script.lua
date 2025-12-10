@@ -259,7 +259,6 @@ local tabList = Instance.new("UIListLayout", tabs)
 tabList.VerticalAlignment = Enum.VerticalAlignment.Top
 tabList.HorizontalAlignment = Enum.HorizontalAlignment.Center
 tabList.Padding = UDim.new(0, 8)
-tabs.Padding = UDim.new(0, 12)
 
 local tabMeta = {
     {"Movement", "rbxassetid://3926305904", Vector2.new(204, 284)},
