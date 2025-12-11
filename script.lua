@@ -1,4 +1,4 @@
--- Advanced Control Panel v4.2 (universal)
+-- Advanced Control Panel v4.3 (Universal)
 -- Drop into an executor; runs as LocalScript on the client.
 
 -- // Services
@@ -21,16 +21,16 @@ local camera = workspace.CurrentCamera
 
 -- // Themes
 local themes = {
-    Blue = {bg = Color3.fromRGB(16, 18, 26), panel = Color3.fromRGB(28, 34, 48), accent = Color3.fromRGB(0, 132, 255), accent2 = Color3.fromRGB(0, 92, 180), text = Color3.fromRGB(225, 235, 248), subtle = Color3.fromRGB(90, 110, 140), success = Color3.fromRGB(50, 200, 120), warn = Color3.fromRGB(255, 170, 60), danger = Color3.fromRGB(255, 70, 70)},
-    NeoGreen = {bg = Color3.fromRGB(12, 16, 12), panel = Color3.fromRGB(24, 32, 28), accent = Color3.fromRGB(0, 200, 140), accent2 = Color3.fromRGB(0, 150, 100), text = Color3.fromRGB(220, 245, 230), subtle = Color3.fromRGB(90, 130, 110), success = Color3.fromRGB(60, 220, 140), warn = Color3.fromRGB(240, 190, 80), danger = Color3.fromRGB(255, 80, 80)},
-    Amber = {bg = Color3.fromRGB(22, 18, 12), panel = Color3.fromRGB(34, 26, 18), accent = Color3.fromRGB(255, 160, 60), accent2 = Color3.fromRGB(220, 120, 40), text = Color3.fromRGB(255, 240, 220), subtle = Color3.fromRGB(150, 110, 80), success = Color3.fromRGB(60, 220, 140), warn = Color3.fromRGB(255, 200, 120), danger = Color3.fromRGB(255, 80, 80)},
-    Purple = {bg = Color3.fromRGB(16, 12, 24), panel = Color3.fromRGB(28, 20, 40), accent = Color3.fromRGB(170, 110, 255), accent2 = Color3.fromRGB(120, 70, 200), text = Color3.fromRGB(235, 225, 255), subtle = Color3.fromRGB(130, 100, 160), success = Color3.fromRGB(80, 210, 140), warn = Color3.fromRGB(250, 190, 110), danger = Color3.fromRGB(255, 90, 120)},
+    Midnight = {bg=Color3.fromRGB(14,16,22), panel=Color3.fromRGB(22,28,40), accent=Color3.fromRGB(0,145,255), accent2=Color3.fromRGB(0,110,200), text=Color3.fromRGB(230,238,255), subtle=Color3.fromRGB(110,130,160), success=Color3.fromRGB(70,210,140), warn=Color3.fromRGB(255,195,90), danger=Color3.fromRGB(255,80,90)},
+    NeoGreen = {bg=Color3.fromRGB(12,16,12), panel=Color3.fromRGB(24,32,28), accent=Color3.fromRGB(0,200,140), accent2=Color3.fromRGB(0,150,100), text=Color3.fromRGB(220,245,230), subtle=Color3.fromRGB(90,130,110), success=Color3.fromRGB(60,220,140), warn=Color3.fromRGB(240,190,80), danger=Color3.fromRGB(255,80,80)},
+    Amber = {bg=Color3.fromRGB(24,18,12), panel=Color3.fromRGB(34,26,18), accent=Color3.fromRGB(255,170,80), accent2=Color3.fromRGB(220,135,60), text=Color3.fromRGB(255,240,220), subtle=Color3.fromRGB(150,110,80), success=Color3.fromRGB(60,220,140), warn=Color3.fromRGB(255,200,120), danger=Color3.fromRGB(255,90,90)},
+    Purple = {bg=Color3.fromRGB(18,12,26), panel=Color3.fromRGB(30,20,44), accent=Color3.fromRGB(170,110,255), accent2=Color3.fromRGB(130,80,210), text=Color3.fromRGB(235,225,255), subtle=Color3.fromRGB(140,110,170), success=Color3.fromRGB(90,220,160), warn=Color3.fromRGB(250,190,120), danger=Color3.fromRGB(255,90,130)},
 }
-local colors = themes.Blue
+local colors = themes.Midnight
 
 -- // Config
 local config = {
-    version = "4.2.0",
+    version = "4.3.0",
     menuKey = Enum.KeyCode.L,
     panicKey = Enum.KeyCode.RightControl,
     aimbotKey = Enum.UserInputType.MouseButton2,
@@ -39,16 +39,18 @@ local config = {
     aimbotEnabled = false,
     triggerEnabled = false,
     esp = {enabled = false, names = true, distance = true, arrows = true, healthbar = true},
-    flySpeed = 60,
+    flySpeed = 75,
     wsBoost = 28,
     jpBoost = 70,
+    sprintSpeed = 40,
+    speedLock = false,
     fov = 80,
     teleportList = {
         {name = "Spawn", pos = Vector3.new(0, 5, 0)},
         {name = "High Point", pos = Vector3.new(0, 50, 0)},
     },
     webhookUrl = "",
-    theme = "Blue",
+    theme = "Midnight",
 }
 local hidden = false
 
@@ -62,6 +64,9 @@ local flyEnabled, flyBV = false, nil
 local noclipEnabled = false
 local autoClickEnabled = false
 local autoInteractEnabled = false
+local sprinting = false
+local infiniteJump = false
+local safeWalkEnabled = false
 local offscreenGui = Instance.new("ScreenGui")
 offscreenGui.Name = "OffscreenGui"
 offscreenGui.ResetOnSpawn = false
@@ -99,7 +104,7 @@ local function setBlur(on)
     if on then
         if not blurEffect then
             blurEffect = Instance.new("BlurEffect")
-            blurEffect.Size = 8
+            blurEffect.Size = 10
             blurEffect.Parent = Lighting
         end
     else
@@ -109,35 +114,13 @@ end
 setBlur(true)
 
 local function applyTheme()
-    local function recolor(guiObj)
-        if guiObj:IsA("Frame") or guiObj:IsA("TextButton") or guiObj:IsA("TextLabel") then
-            if guiObj:GetAttribute("Accent") then
-                guiObj.BackgroundColor3 = colors.accent
-            elseif guiObj:GetAttribute("Panel") then
-                guiObj.BackgroundColor3 = colors.panel
-            elseif guiObj:GetAttribute("BG") then
-                guiObj.BackgroundColor3 = colors.bg
-            end
-            if guiObj:IsA("TextLabel") or guiObj:IsA("TextButton") then
-                guiObj.TextColor3 = colors.text
-            end
-        elseif guiObj:IsA("UIGradient") and guiObj.Parent and guiObj.Parent:GetAttribute("BG") then
-            guiObj.Color = ColorSequence.new({
-                ColorSequenceKeypoint.new(0, colors.bg),
-                ColorSequenceKeypoint.new(1, colors.accent2)
-            })
-        end
-        for _, child in ipairs(guiObj:GetChildren()) do
-            recolor(child)
-        end
-    end
-    recolor(gui)
+    colors = themes[config.theme] or colors
 end
 
 local function setConfigClipboard()
     if setclipboard then
         setclipboard(HttpService:JSONEncode(config))
-        toast("Config copied to clipboard")
+        toast("Config copied")
     else
         toast("setclipboard not available")
     end
@@ -152,15 +135,15 @@ local function loadConfigFromString(str)
     end
 end
 
--- // GUI
+-- // UI build
 local gui = Instance.new("ScreenGui")
 gui.Name = "AdvancedMenu"
 gui.ResetOnSpawn = false
 gui.Parent = game:GetService("CoreGui")
 
 local main = Instance.new("Frame")
-main.Size = UDim2.fromOffset(540, 380)
-main.Position = UDim2.new(0.5, -270, 0.5, -190)
+main.Size = UDim2.fromOffset(560, 400)
+main.Position = UDim2.new(0.5, -280, 0.5, -200)
 main.BackgroundColor3 = colors.bg
 main.BorderSizePixel = 0
 main.Active = false
@@ -170,9 +153,9 @@ main.Parent = gui
 Instance.new("UICorner", main).CornerRadius = UDim.new(0, 12)
 local gradient = Instance.new("UIGradient", main)
 gradient.Color = ColorSequence.new{ColorSequenceKeypoint.new(0, colors.bg), ColorSequenceKeypoint.new(1, colors.accent2)}
-gradient.Rotation = 45
+gradient.Rotation = 65
 
--- Drag handle (title only)
+-- Drag only by title
 local dragging=false; local dragStart; local startPos
 local function beginDrag(input)
     dragging=true; dragStart=input.Position; startPos=main.Position
@@ -188,7 +171,7 @@ end
 
 -- Quick actions
 local quick = Instance.new("Frame")
-quick.Size = UDim2.new(0, 540, 0, 32)
+quick.Size = UDim2.new(0, 560, 0, 32)
 quick.Position = UDim2.new(0, 0, 0, -36)
 quick.BackgroundTransparency = 1
 quick.Parent = main
@@ -231,7 +214,7 @@ end)
 
 -- Title bar
 local title = Instance.new("Frame")
-title.Size = UDim2.new(1, 0, 0, 44)
+title.Size = UDim2.new(1, 0, 0, 46)
 title.BackgroundColor3 = colors.panel
 title.BorderSizePixel = 0
 title:SetAttribute("Panel", true)
@@ -248,8 +231,8 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -170, 1, 0)
 titleLabel.Position = UDim2.new(0, 16, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Font = Enum.Font.GothamSemibold
-titleLabel.Text = "Advanced Control Panel v4.2"
+titleLabel.Font = Enum.Font.GothamBold
+titleLabel.Text = "Advanced Control Panel v4.3"
 titleLabel.TextColor3 = colors.text
 titleLabel.TextSize = 18
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -266,10 +249,10 @@ versionLabel.TextSize = 14
 versionLabel.TextXAlignment = Enum.TextXAlignment.Right
 versionLabel.Parent = title
 
--- Tabs with icons
+-- Tabs
 local tabs = Instance.new("Frame")
-tabs.Size = UDim2.new(0, 160, 1, -44)
-tabs.Position = UDim2.new(0, 0, 0, 44)
+tabs.Size = UDim2.new(0, 170, 1, -46)
+tabs.Position = UDim2.new(0, 0, 0, 46)
 tabs.BackgroundColor3 = colors.panel
 tabs.BorderSizePixel = 0
 tabs:SetAttribute("Panel", true)
@@ -291,8 +274,8 @@ local tabMeta = {
 local pages = {}
 local selectedTab
 local pageHolder = Instance.new("Frame")
-pageHolder.Size = UDim2.new(1, -160, 1, -44)
-pageHolder.Position = UDim2.new(0, 160, 0, 44)
+pageHolder.Size = UDim2.new(1, -170, 1, -46)
+pageHolder.Position = UDim2.new(0, 170, 0, 46)
 pageHolder.BackgroundTransparency = 1
 pageHolder.Parent = main
 
@@ -375,7 +358,7 @@ tween(tabButtons["Movement"], 0.01, {BackgroundColor3 = colors.accent})
 tabIndicator.Position = UDim2.new(0, 4, 0, tabButtons["Movement"].Position.Y.Offset)
 tabIndicator.Visible = true
 
--- // Control builders
+-- // Controls
 local function makeToggle(parent, label, callback, defaultState)
     local f = Instance.new("Frame")
     f.Size = UDim2.new(1, -10, 0, 40)
@@ -433,7 +416,7 @@ local function makeButton(parent, label, callback)
     b.TextColor3 = colors.text
     b.TextSize = 15
     b.Text = label
-    b.SetAttribute(b, "Panel", true)
+    b:SetAttribute("Panel", true)
     Instance.new("UICorner", b).CornerRadius = UDim.new(0, 10)
     b.Parent = parent
     b.MouseEnter:Connect(function() tween(b, 0.08, {BackgroundColor3 = colors.accent2}) end)
@@ -484,13 +467,13 @@ local function makeSlider(parent, label, min, max, default, callback)
     fill.BorderSizePixel = 0
     fill.Parent = bar
     Instance.new("UICorner", fill).CornerRadius = UDim.new(1, 0)
+    local draggingSlider = false
     local function setValue(v)
         v = math.clamp(v, min, max)
         valueLabel.Text = tostring(math.floor(v * 100) / 100)
         tween(fill, 0.1, {Size = UDim2.new((v - min) / (max - min), 0, 1, 0)})
         if callback then task.spawn(function() callback(v) end) end
     end
-    local draggingSlider = false
     bar.InputBegan:Connect(function(inp)
         if inp.UserInputType == Enum.UserInputType.MouseButton1 then
             draggingSlider = true
@@ -665,10 +648,23 @@ end
 
 -- // Movement tab
 local movePage = pages["Movement"]
-makeToggle(movePage, "Speed Boost", function(on) Hum.WalkSpeed = on and config.wsBoost or wsDefault end)
+makeToggle(movePage, "Speed Boost", function(on)
+    Hum.WalkSpeed = on and config.wsBoost or wsDefault
+    if config.speedLock and on then
+        Hum:GetPropertyChangedSignal("WalkSpeed"):Connect(function()
+            if config.speedLock then Hum.WalkSpeed = config.wsBoost end
+        end)
+    end
+end)
 makeToggle(movePage, "High Jump", function(on) Hum.JumpPower = on and config.jpBoost or jpDefault end)
-makeSlider(movePage, "WalkSpeed", 8, 120, config.wsBoost, function(v) config.wsBoost = v; if Hum.WalkSpeed ~= wsDefault then Hum.WalkSpeed = v end end)
-makeSlider(movePage, "JumpPower", 20, 150, config.jpBoost, function(v) config.jpBoost = v; if Hum.JumpPower ~= jpDefault then Hum.JumpPower = v end end)
+makeSlider(movePage, "WalkSpeed", 8, 160, config.wsBoost, function(v)
+    config.wsBoost = v
+    if Hum.WalkSpeed ~= wsDefault then Hum.WalkSpeed = v end
+end)
+makeSlider(movePage, "JumpPower", 20, 150, config.jpBoost, function(v)
+    config.jpBoost = v
+    if Hum.JumpPower ~= jpDefault then Hum.JumpPower = v end
+end)
 makeToggle(movePage, "Fly", function(on)
     flyEnabled = on
     if on then
@@ -682,8 +678,13 @@ makeToggle(movePage, "Fly", function(on)
         if flyBV then flyBV:Destroy(); flyBV = nil end
     end
 end)
-makeSlider(movePage, "Fly Speed", 10, 200, config.flySpeed, function(v) config.flySpeed = v end)
+makeSlider(movePage, "Fly Speed", 10, 250, config.flySpeed, function(v) config.flySpeed = v end)
+makeToggle(movePage, "Sprint (hold Shift)", function(on) sprinting = on end)
+makeSlider(movePage, "Sprint Speed", 20, 200, config.sprintSpeed, function(v) config.sprintSpeed = v end)
+makeToggle(movePage, "Speed Lock", function(on) config.speedLock = on end, config.speedLock)
 makeToggle(movePage, "Noclip", function(on) noclipEnabled = on end)
+makeToggle(movePage, "Infinite Jump", function(on) infiniteJump = on end)
+makeToggle(movePage, "Safe-Walk", function(on) safeWalkEnabled = on end)
 makeButton(movePage, "Preset: Parkour (WS 36 JP 90)", function()
     config.wsBoost = 36; config.jpBoost = 90; flyEnabled = false
     Hum.WalkSpeed = config.wsBoost; Hum.JumpPower = config.jpBoost
@@ -805,7 +806,7 @@ makeButton(configPage, "Open Import Modal", function()
     cancelBtn.Position = UDim2.new(0.5, 5, 0, 140)
     cancelBtn.Size = UDim2.new(0.5, -15, 0, 40)
 end)
-makeDropdown(configPage, "Theme", {"Blue", "NeoGreen", "Amber", "Purple"}, function(val)
+makeDropdown(configPage, "Theme", {"Midnight", "NeoGreen", "Amber", "Purple"}, function(val)
     config.theme = val
     colors = themes[val] or colors
     applyTheme()
@@ -888,13 +889,15 @@ UserInputService.InputBegan:Connect(function(input, gp)
     if gp then return end
     if input.KeyCode == config.menuKey then
         hidden = not hidden
-        tween(main, 0.25, {Position = hidden and UDim2.new(0.5, -270, 1.1, 0) or UDim2.new(0.5, -270, 0.5, -190)})
+        tween(main, 0.22, {Position = hidden and UDim2.new(0.5, -280, 1.1, 0) or UDim2.new(0.5, -280, 0.5, -200)})
         main.Active = not hidden
         gui.Enabled = not hidden
         fovCircle.Visible = config.aimbotEnabled and not hidden
     elseif input.KeyCode == config.panicKey then
         clearESP(); gui:Destroy(); offscreenGui:Destroy(); setBlur(false)
         Hum.WalkSpeed = wsDefault; Hum.JumpPower = jpDefault
+    elseif input.KeyCode == Enum.KeyCode.Space and infiniteJump then
+        Hum:ChangeState(Enum.HumanoidStateType.Jumping)
     end
 end)
 
@@ -904,6 +907,11 @@ table.insert(connections, RunService.Stepped:Connect(function()
         for _, part in ipairs(Char:GetDescendants()) do
             if part:IsA("BasePart") then part.CanCollide = false end
         end
+    end
+    if safeWalkEnabled and HRP then
+        local ray = Ray.new(HRP.Position, Vector3.new(0, -6, 0))
+        local hit = workspace:FindPartOnRay(ray, Char)
+        if not hit then HRP.Velocity = Vector3.new(HRP.Velocity.X, 0, HRP.Velocity.Z) end
     end
 end))
 
@@ -919,6 +927,11 @@ table.insert(connections, RunService.RenderStepped:Connect(function()
         if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then dir -= camCF.UpVector end
         if dir.Magnitude > 0 then dir = dir.Unit * config.flySpeed else dir = Vector3.new() end
         flyBV.Velocity = dir
+    end
+    if sprinting and UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) and not flyEnabled then
+        Hum.WalkSpeed = config.sprintSpeed
+    elseif sprinting and not flyEnabled then
+        Hum.WalkSpeed = config.wsBoost
     end
 end))
 
@@ -973,7 +986,7 @@ table.insert(connections, RunService.RenderStepped:Connect(function()
     perf.Text = ("FPS: %d | Ping: %dms"):format(math.floor(fps), ping)
 end))
 
--- Slight float animation
+-- Float animation
 task.spawn(function()
     while gui.Parent do
         tween(main, 1.6, {Position = UDim2.new(main.Position.X.Scale, main.Position.X.Offset, main.Position.Y.Scale, main.Position.Y.Offset + 4)}, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
