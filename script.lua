@@ -1,4 +1,4 @@
--- Advanced Universal Hub v5.0
+-- Advanced Universal Hub v5.1
 -- Universal client script for executors. No place lock. Menu key L, Panic RightControl by default.
 
 -- // Services
@@ -30,7 +30,7 @@ local colors = themes.Midnight
 
 -- // Config
 local config = {
-    version = "5.0.0",
+    version = "5.1.0",
     menuKey = Enum.KeyCode.L,
     panicKey = Enum.KeyCode.RightControl,
     aimbotKey = Enum.UserInputType.MouseButton2,
@@ -142,13 +142,15 @@ local function makeToggle(parent, label, callback, defaultState)
     l.BackgroundTransparency = 1; l.Size = UDim2.new(1, -70, 1, 0); l.Position = UDim2.new(0, 12, 0, 0)
     l.Font = Enum.Font.Gotham; l.TextColor3 = colors.text; l.TextSize = 15; l.TextXAlignment = Enum.TextXAlignment.Left; l.Text = label; l.Parent = f
     local btn = Instance.new("TextButton"); btn.Size = UDim2.fromOffset(56, 24); btn.Position = UDim2.new(1, -70, 0.5, -12)
-    btn.BackgroundColor3 = colors.bg; btn.BorderSizePixel = 0; btn.AutoButtonColor = false; btn.Text = ""; makeCorner(btn,24); btn.Parent = f
+    btn.BackgroundColor3 = colors.bg; btn.BorderSizePixel = 0; btn.AutoButtonColor = false; btn.Text = "Off"; btn.TextColor3 = colors.text; btn.Font = Enum.Font.GothamSemibold; btn.TextSize = 12; makeCorner(btn,24); btn.Parent = f
     local knob = Instance.new("Frame"); knob.Size=UDim2.fromOffset(20,20); knob.Position=UDim2.new(0,2,0.5,-10); knob.BackgroundColor3=colors.subtle; knob.BorderSizePixel=0; makeCorner(knob,20); knob.Parent=btn
     local on = defaultState or false
     local function set(state)
         on = state
         tween(btn, 0.16, {BackgroundColor3 = on and colors.accent or colors.bg})
         tween(knob, 0.16, {Position = on and UDim2.new(1, -22, 0.5, -10) or UDim2.new(0, 2, 0.5, -10), BackgroundColor3 = on and Color3.new(1,1,1) or colors.subtle})
+        btn.Text = on and "On" or "Off"
+        btn.TextColor3 = on and Color3.new(1,1,1) or colors.text
         if callback then task.spawn(function() callback(on) end) end
     end
     btn.MouseButton1Click:Connect(function() ripple(btn); set(not on); log("toggle", label .. "=" .. tostring(not on)) end)
@@ -323,13 +325,15 @@ local function applyTheme() colors = themes[config.theme] or colors end
 local function makeToggle(parent,label,cb,defaultState)
     local f=Instance.new("Frame"); f.Size=UDim2.new(1,-10,0,40); f.BackgroundColor3=colors.panel; f.BorderSizePixel=0; makeCorner(f,10); f.Parent=parent
     local l=Instance.new("TextLabel"); l.BackgroundTransparency=1; l.Size=UDim2.new(1,-70,1,0); l.Position=UDim2.new(0,12,0,0); l.Font=Enum.Font.Gotham; l.TextColor3=colors.text; l.TextSize=15; l.TextXAlignment=Enum.TextXAlignment.Left; l.Text=label; l.Parent=f
-    local btn=Instance.new("TextButton"); btn.Size=UDim2.fromOffset(56,24); btn.Position=UDim2.new(1,-70,0.5,-12); btn.BackgroundColor3=colors.bg; btn.BorderSizePixel=0; btn.AutoButtonColor=false; btn.Text=""; makeCorner(btn,24); btn.Parent=f
+    local btn=Instance.new("TextButton"); btn.Size=UDim2.fromOffset(56,24); btn.Position=UDim2.new(1,-70,0.5,-12); btn.BackgroundColor3=colors.bg; btn.BorderSizePixel=0; btn.AutoButtonColor=false; btn.Text="Off"; btn.TextColor3=colors.text; btn.Font=Enum.Font.GothamSemibold; btn.TextSize=12; makeCorner(btn,24); btn.Parent=f
     local knob=Instance.new("Frame"); knob.Size=UDim2.fromOffset(20,20); knob.Position=UDim2.new(0,2,0.5,-10); knob.BackgroundColor3=colors.subtle; knob.BorderSizePixel=0; makeCorner(knob,20); knob.Parent=btn
     local on=defaultState or false
     local function set(state)
         on=state
         tween(btn,0.16,{BackgroundColor3=on and colors.accent or colors.bg})
         tween(knob,0.16,{Position=on and UDim2.new(1,-22,0.5,-10) or UDim2.new(0,2,0.5,-10), BackgroundColor3=on and Color3.new(1,1,1) or colors.subtle})
+        btn.Text = on and "On" or "Off"
+        btn.TextColor3 = on and Color3.new(1,1,1) or colors.text
         if cb then task.spawn(function() cb(on) end) end
     end
     btn.MouseButton1Click:Connect(function() ripple(btn); set(not on); log("toggle",label.."="..tostring(not on)) end)
@@ -388,6 +392,10 @@ title.InputChanged:Connect(function(i) if i.UserInputType==Enum.UserInputType.Mo
 local titleLabel=Instance.new("TextLabel"); titleLabel.Size=UDim2.new(1,-170,1,0); titleLabel.Position=UDim2.new(0,16,0,0); titleLabel.BackgroundTransparency=1; titleLabel.Font=Enum.Font.GothamBold; titleLabel.Text="Advanced Universal Hub v5.1"; titleLabel.TextColor3=colors.text; titleLabel.TextSize=18; titleLabel.TextXAlignment=Enum.TextXAlignment.Left; titleLabel.Parent=title
 local versionLabel=Instance.new("TextLabel"); versionLabel.Size=UDim2.new(0,140,1,0); versionLabel.Position=UDim2.new(1,-150,0,0); versionLabel.BackgroundTransparency=1; versionLabel.Font=Enum.Font.Gotham; versionLabel.Text="v"..config.version; versionLabel.TextColor3=colors.subtle; versionLabel.TextSize=14; versionLabel.TextXAlignment=Enum.TextXAlignment.Right; versionLabel.Parent=title
 
+-- Status bar (FPS/Ping)
+local statusBar=Instance.new("Frame"); statusBar.Size=UDim2.new(0,200,0,26); statusBar.Position=UDim2.new(1,-210,0,50); statusBar.AnchorPoint=Vector2.new(0,0); statusBar.BackgroundColor3=colors.panel; statusBar.BorderSizePixel=0; statusBar.Parent=main; statusBar.BackgroundTransparency=0.1; makeCorner(statusBar,8)
+local statusLabel=Instance.new("TextLabel"); statusLabel.BackgroundTransparency=1; statusLabel.Size=UDim2.new(1,-10,1,0); statusLabel.Position=UDim2.new(0,8,0,0); statusLabel.Font=Enum.Font.GothamSemibold; statusLabel.TextColor3=colors.text; statusLabel.TextSize=13; statusLabel.TextXAlignment=Enum.TextXAlignment.Left; statusLabel.Text="FPS: -- | Ping: --"; statusLabel.Parent=statusBar
+
 -- Quick pills
 local quick=Instance.new("Frame"); quick.Size=UDim2.new(0,600,0,32); quick.Position=UDim2.new(0,0,0,-36); quick.BackgroundTransparency=1; quick.Parent=main
 local qaList=Instance.new("UIListLayout",quick); qaList.Padding=UDim.new(0,8); qaList.FillDirection=Enum.FillDirection.Horizontal; qaList.HorizontalAlignment=Enum.HorizontalAlignment.Right; qaList.VerticalAlignment=Enum.VerticalAlignment.Center
@@ -404,8 +412,9 @@ local pages={}
 local selectedTab
 local pageHolder=Instance.new("Frame"); pageHolder.Size=UDim2.new(1,-170,1,-46); pageHolder.Position=UDim2.new(0,170,0,46); pageHolder.BackgroundTransparency=1; pageHolder.Parent=main
 for _,name in ipairs(tabNames) do
-    local page=Instance.new("Frame"); page.Size=UDim2.new(1,-24,1,-24); page.Position=UDim2.new(0,12,0,12); page.BackgroundTransparency=1; page.Visible=false; page.Parent=pageHolder
+    local page=Instance.new("ScrollingFrame"); page.Size=UDim2.new(1,-24,1,-24); page.Position=UDim2.new(0,12,0,12); page.BackgroundTransparency=1; page.Visible=false; page.ScrollBarThickness=6; page.AutomaticCanvasSize=Enum.AutomaticSize.Y; page.CanvasSize=UDim2.new(); page.Parent=pageHolder
     local list=Instance.new("UIListLayout",page); list.Padding=UDim.new(0,10); list.FillDirection=Enum.FillDirection.Vertical; list.HorizontalAlignment=Enum.HorizontalAlignment.Left; list.VerticalAlignment=Enum.VerticalAlignment.Top
+    local pad=Instance.new("UIPadding",page); pad.PaddingTop=UDim.new(0,4); pad.PaddingBottom=UDim.new(0,4); pad.PaddingLeft=UDim.new(0,2); pad.PaddingRight=UDim.new(0,2)
     pages[name]=page
 end
 local tabButtons={}
@@ -735,7 +744,7 @@ local last=tick()
 table.insert(connections, RunService.RenderStepped:Connect(function()
     local now=tick(); local fps=1/(now-last); last=now
     local ping=math.floor(Stats.Network.ServerStatsItem["Data Ping"]:GetValue() or 0)
-    -- status tab labels updated via references (omitted here for brevity)
+    if statusLabel then statusLabel.Text = ("FPS: %d | Ping: %dms"):format(math.floor(fps), ping) end
 end))
 
 -- Float anim
