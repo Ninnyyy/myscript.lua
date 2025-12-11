@@ -1,10 +1,5 @@
--- Advanced Control Panel v4.1 for game 121864768012064
+-- Advanced Control Panel v4.2 (universal)
 -- Drop into an executor; runs as LocalScript on the client.
-
-if game.PlaceId ~= 121864768012064 then
-    warn("Wrong game! This script is for game 121864768012064")
-    return
-end
 
 -- // Services
 local Players = game:GetService("Players")
@@ -35,7 +30,7 @@ local colors = themes.Blue
 
 -- // Config
 local config = {
-    version = "4.1.0",
+    version = "4.2.0",
     menuKey = Enum.KeyCode.L,
     panicKey = Enum.KeyCode.RightControl,
     aimbotKey = Enum.UserInputType.MouseButton2,
@@ -76,7 +71,6 @@ offscreenGui.Parent = game:GetService("CoreGui")
 local function tween(obj, time, props, style, dir)
     return TweenService:Create(obj, TweenInfo.new(time, style or Enum.EasingStyle.Quint, dir or Enum.EasingDirection.Out), props)
 end
-
 local function ripple(button)
     local r = Instance.new("Frame")
     r.BackgroundColor3 = colors.accent
@@ -89,11 +83,18 @@ local function ripple(button)
     r.Parent = button
     tween(r, 0.35, {Size = UDim2.fromScale(2.4, 2.4), BackgroundTransparency = 1}).Completed:Connect(function() r:Destroy() end)
 end
-
-local function toast(msg, color)
+local function toast(msg)
     StarterGui:SetCore("SendNotification", {Title = "Advanced", Text = msg, Duration = 3, Button1 = "OK"})
 end
-
+local function log(event, data)
+    if config.webhookUrl == "" then return end
+    task.spawn(function()
+        local payload = HttpService:JSONEncode({content = ("[%s] %s"):format(event, data or "")})
+        pcall(function()
+            http_request({Url = config.webhookUrl, Method = "POST", Headers = {["Content-Type"] = "application/json"}, Body = payload})
+        end)
+    end)
+end
 local function setBlur(on)
     if on then
         if not blurEffect then
@@ -130,31 +131,30 @@ local function applyTheme()
             recolor(child)
         end
     end
-    recolor(game:GetService("CoreGui"):FindFirstChild("AdvancedMenu") or Instance.new("Folder"))
+    recolor(gui)
 end
 
 local function setConfigClipboard()
     if setclipboard then
         setclipboard(HttpService:JSONEncode(config))
-        toast("Config copied to clipboard", colors.success)
+        toast("Config copied to clipboard")
     else
-        toast("setclipboard not available", colors.warn)
+        toast("setclipboard not available")
     end
 end
-
 local function loadConfigFromString(str)
     local ok, data = pcall(function() return HttpService:JSONDecode(str) end)
     if ok and type(data) == "table" then
         for k,v in pairs(data) do config[k] = v end
-        toast("Config loaded", colors.success)
+        toast("Config loaded")
     else
-        toast("Failed to load config", colors.danger)
+        toast("Failed to load config")
     end
 end
 
 -- // GUI
 local gui = Instance.new("ScreenGui")
-gui.Name = "idk why advanced menu"
+gui.Name = "AdvancedMenu"
 gui.ResetOnSpawn = false
 gui.Parent = game:GetService("CoreGui")
 
@@ -163,14 +163,28 @@ main.Size = UDim2.fromOffset(540, 380)
 main.Position = UDim2.new(0.5, -270, 0.5, -190)
 main.BackgroundColor3 = colors.bg
 main.BorderSizePixel = 0
-main.Active = true
-main.Draggable = true
+main.Active = false
+main.Draggable = false
 main:SetAttribute("BG", true)
 main.Parent = gui
 Instance.new("UICorner", main).CornerRadius = UDim.new(0, 12)
 local gradient = Instance.new("UIGradient", main)
 gradient.Color = ColorSequence.new{ColorSequenceKeypoint.new(0, colors.bg), ColorSequenceKeypoint.new(1, colors.accent2)}
 gradient.Rotation = 45
+
+-- Drag handle (title only)
+local dragging=false; local dragStart; local startPos
+local function beginDrag(input)
+    dragging=true; dragStart=input.Position; startPos=main.Position
+    input.Changed:Connect(function()
+        if input.UserInputState==Enum.UserInputState.End then dragging=false end
+    end)
+end
+local function updateDrag(input)
+    if not dragging then return end
+    local delta=input.Position - dragStart
+    main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+end
 
 -- Quick actions
 local quick = Instance.new("Frame")
@@ -223,13 +237,19 @@ title.BorderSizePixel = 0
 title:SetAttribute("Panel", true)
 title.Parent = main
 Instance.new("UICorner", title).CornerRadius = UDim.new(0, 12)
+title.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then beginDrag(input) end
+end)
+title.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement then updateDrag(input) end
+end)
 
 local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -170, 1, 0)
 titleLabel.Position = UDim2.new(0, 16, 0, 0)
 titleLabel.BackgroundTransparency = 1
 titleLabel.Font = Enum.Font.GothamSemibold
-titleLabel.Text = "Advanced Control Panel v4.1"
+titleLabel.Text = "Advanced Control Panel v4.2"
 titleLabel.TextColor3 = colors.text
 titleLabel.TextSize = 18
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -398,7 +418,7 @@ local function makeToggle(parent, label, callback, defaultState)
         tween(knob, 0.16, {Position = on and UDim2.new(1, -22, 0.5, -10) or UDim2.new(0, 2, 0.5, -10), BackgroundColor3 = on and Color3.new(1, 1, 1) or colors.subtle})
         if callback then task.spawn(function() callback(on) end) end
     end
-    btn.MouseButton1Click:Connect(function() ripple(btn); set(not on) end)
+    btn.MouseButton1Click:Connect(function() ripple(btn); set(not on); log("toggle", label .. " = " .. tostring(not on)) end)
     set(on)
     return set
 end
@@ -413,7 +433,7 @@ local function makeButton(parent, label, callback)
     b.TextColor3 = colors.text
     b.TextSize = 15
     b.Text = label
-    b:SetAttribute("Panel", true)
+    b.SetAttribute(b, "Panel", true)
     Instance.new("UICorner", b).CornerRadius = UDim.new(0, 10)
     b.Parent = parent
     b.MouseEnter:Connect(function() tween(b, 0.08, {BackgroundColor3 = colors.accent2}) end)
@@ -470,18 +490,17 @@ local function makeSlider(parent, label, min, max, default, callback)
         tween(fill, 0.1, {Size = UDim2.new((v - min) / (max - min), 0, 1, 0)})
         if callback then task.spawn(function() callback(v) end) end
     end
-    local function input(posX)
-        local rel = (posX - bar.AbsolutePosition.X) / bar.AbsoluteSize.X
-        setValue(min + (max - min) * rel)
-    end
+    local draggingSlider = false
     bar.InputBegan:Connect(function(inp)
         if inp.UserInputType == Enum.UserInputType.MouseButton1 then
-            input(UserInputService:GetMouseLocation().X)
+            draggingSlider = true
+            setValue(min + (max - min) * ((UserInputService:GetMouseLocation().X - bar.AbsolutePosition.X) / bar.AbsoluteSize.X))
         end
     end)
+    bar.InputEnded:Connect(function(inp) if inp.UserInputType == Enum.UserInputType.MouseButton1 then draggingSlider=false end end)
     UserInputService.InputChanged:Connect(function(inp)
-        if inp.UserInputType == Enum.UserInputType.MouseMovement and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then
-            input(UserInputService:GetMouseLocation().X)
+        if draggingSlider and inp.UserInputType == Enum.UserInputType.MouseMovement then
+            setValue(min + (max - min) * ((UserInputService:GetMouseLocation().X - bar.AbsolutePosition.X) / bar.AbsoluteSize.X))
         end
     end)
     setValue(default)
@@ -639,11 +658,12 @@ local function buildTeleportButtons(container)
     for _, item in ipairs(config.teleportList) do
         makeButton(container, "TP: " .. item.name, function()
             if HRP then HRP.CFrame = CFrame.new(item.pos) end
+            log("teleport", item.name)
         end)
     end
 end
 
--- // Movement tab (with fly + speed sliders)
+-- // Movement tab
 local movePage = pages["Movement"]
 makeToggle(movePage, "Speed Boost", function(on) Hum.WalkSpeed = on and config.wsBoost or wsDefault end)
 makeToggle(movePage, "High Jump", function(on) Hum.JumpPower = on and config.jpBoost or jpDefault end)
@@ -654,7 +674,7 @@ makeToggle(movePage, "Fly", function(on)
     if on then
         if not flyBV then
             flyBV = Instance.new("BodyVelocity")
-            flyBV.MaxForce = Vector3.new(1e4, 1e4, 1e4)
+            flyBV.MaxForce = Vector3.new(1e6, 1e6, 1e6)
             flyBV.Velocity = Vector3.new()
             flyBV.Parent = HRP
         end
@@ -667,12 +687,12 @@ makeToggle(movePage, "Noclip", function(on) noclipEnabled = on end)
 makeButton(movePage, "Preset: Parkour (WS 36 JP 90)", function()
     config.wsBoost = 36; config.jpBoost = 90; flyEnabled = false
     Hum.WalkSpeed = config.wsBoost; Hum.JumpPower = config.jpBoost
-    toast("Applied Parkour preset", colors.success)
+    toast("Applied Parkour preset")
 end)
 makeButton(movePage, "Preset: Combat (WS 30 JP 80 FOV 90)", function()
     config.wsBoost = 30; config.jpBoost = 80; camera.FieldOfView = 90
     Hum.WalkSpeed = config.wsBoost; Hum.JumpPower = config.jpBoost
-    toast("Applied Combat preset", colors.success)
+    toast("Applied Combat preset")
 end)
 
 -- // Visuals tab
@@ -717,7 +737,7 @@ makeButton(combatPage, "Reset Camera FOV", function() camera.FieldOfView = 70 en
 
 -- // Utility tab
 local utilPage = pages["Utility"]
-makeButton(utilPage, "Teleport: Safe Spot", function() if HRP then HRP.CFrame = CFrame.new(0, 50, 0) end end)
+makeButton(utilPage, "Teleport: Safe Spot", function() if HRP then HRP.CFrame = CFrame.new(0, 50, 0); log("teleport","Safe Spot") end end)
 makeButton(utilPage, "Rejoin Game", function() TeleportService:Teleport(game.PlaceId, LP) end)
 makeToggle(utilPage, "Auto Clicker", function(on) autoClickEnabled = on end)
 makeToggle(utilPage, "Auto Interact (ProximityPrompts)", function(on) autoInteractEnabled = on end)
@@ -725,12 +745,12 @@ makeButton(utilPage, "Add Current Position to Teleports", function()
     if HRP then
         table.insert(config.teleportList, {name = "Pos" .. #config.teleportList + 1, pos = HRP.Position})
         buildTeleportButtons(utilPage)
-        toast("Saved teleport #" .. #config.teleportList, colors.success)
+        toast("Saved teleport #" .. #config.teleportList)
     end
 end)
 buildTeleportButtons(utilPage)
 makeButton(utilPage, "Server Hop (lowest ping)", function()
-    toast("Scanning servers...", colors.subtle)
+    toast("Scanning servers...")
     task.spawn(function()
         local url = ("https://games.roblox.com/v1/games/%d/servers/Public?sortOrder=Asc&limit=25"):format(game.PlaceId)
         local ok, res = pcall(function() return HttpService:JSONDecode(game:HttpGet(url)) end)
@@ -738,13 +758,14 @@ makeButton(utilPage, "Server Hop (lowest ping)", function()
             table.sort(res.data, function(a,b) return (a.ping or 1e9) < (b.ping or 1e9) end)
             local target = res.data[1]
             if target then
-                toast("Hopping...", colors.success)
+                toast("Hopping...")
+                log("server_hop", tostring(target.id))
                 TeleportService:TeleportToPlaceInstance(game.PlaceId, target.id, LP)
             else
-                toast("No servers found", colors.warn)
+                toast("No servers found")
             end
         else
-            toast("Server fetch failed", colors.danger)
+            toast("Server fetch failed")
         end
     end)
 end)
@@ -790,39 +811,39 @@ makeDropdown(configPage, "Theme", {"Blue", "NeoGreen", "Amber", "Purple"}, funct
     applyTheme()
 end)
 makeButton(configPage, "Check for Update", function()
-    toast("Attempting update fetch...", colors.subtle)
+    toast("Attempting update fetch...")
     task.spawn(function()
         local ok = pcall(function() game:HttpGet("https://raw.githubusercontent.com/Ninnyyy/myscript.lua/main/script.lua") end)
-        toast(ok and "Fetched latest script (replace manually)" or "Update fetch failed", ok and colors.success or colors.danger)
+        toast(ok and "Fetched latest script (replace manually)" or "Update fetch failed")
     end)
 end)
 makeButton(configPage, "Test Webhook", function()
-    if config.webhookUrl == "" then toast("Webhook URL empty", colors.warn) return end
+    if config.webhookUrl == "" then toast("Webhook URL empty"); return end
     task.spawn(function()
         local payload = HttpService:JSONEncode({content = "Test ping from script v" .. config.version})
         pcall(function()
             http_request({Url = config.webhookUrl, Method = "POST", Headers = {["Content-Type"] = "application/json"}, Body = payload})
         end)
-        toast("Webhook sent (if allowed)", colors.success)
+        toast("Webhook sent (if allowed)")
     end)
 end)
 
 -- Keybind editor
 makeButton(configPage, "Change Menu Key (click then press)", function()
-    toast("Press a key for Menu", colors.warn)
+    toast("Press a key for Menu")
     local conn; conn = UserInputService.InputBegan:Connect(function(inp, gp)
         if gp or inp.UserInputType ~= Enum.UserInputType.Keyboard then return end
         config.menuKey = inp.KeyCode
-        toast("Menu key set to " .. tostring(inp.KeyCode), colors.success)
+        toast("Menu key set to " .. tostring(inp.KeyCode))
         conn:Disconnect()
     end)
 end)
 makeButton(configPage, "Change Panic Key (click then press)", function()
-    toast("Press a key for Panic", colors.warn)
+    toast("Press a key for Panic")
     local conn; conn = UserInputService.InputBegan:Connect(function(inp, gp)
         if gp or inp.UserInputType ~= Enum.UserInputType.Keyboard then return end
         config.panicKey = inp.KeyCode
-        toast("Panic key set to " .. tostring(inp.KeyCode), colors.success)
+        toast("Panic key set to " .. tostring(inp.KeyCode))
         conn:Disconnect()
     end)
 end)
@@ -978,4 +999,4 @@ LP.CharacterAdded:Connect(function(newChar)
 end)
 
 applyTheme()
-toast("Loaded Advanced Control Panel v" .. config.version, colors.success)
+toast("Loaded Advanced Control Panel v" .. config.version)
