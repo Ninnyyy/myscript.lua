@@ -25,8 +25,9 @@ local themes = {
     NeoGreen = {bg=Color3.fromRGB(12,16,12), panel=Color3.fromRGB(24,32,28), accent=Color3.fromRGB(0,200,140), accent2=Color3.fromRGB(0,150,100), text=Color3.fromRGB(220,245,230), subtle=Color3.fromRGB(90,130,110), success=Color3.fromRGB(60,220,140), warn=Color3.fromRGB(240,190,80), danger=Color3.fromRGB(255,80,80)},
     Amber    = {bg=Color3.fromRGB(24,18,12), panel=Color3.fromRGB(34,26,18), accent=Color3.fromRGB(255,170,80), accent2=Color3.fromRGB(220,135,60), text=Color3.fromRGB(255,240,220), subtle=Color3.fromRGB(150,110,80), success=Color3.fromRGB(60,220,140), warn=Color3.fromRGB(255,200,120), danger=Color3.fromRGB(255,90,90)},
     Purple   = {bg=Color3.fromRGB(18,12,26), panel=Color3.fromRGB(30,20,44), accent=Color3.fromRGB(170,110,255), accent2=Color3.fromRGB(130,80,210), text=Color3.fromRGB(235,225,255), subtle=Color3.fromRGB(140,110,170), success=Color3.fromRGB(90,220,160), warn=Color3.fromRGB(250,190,120), danger=Color3.fromRGB(255,90,130)},
+    Christmas = {bg=Color3.fromRGB(14,18,16), panel=Color3.fromRGB(22,28,24), accent=Color3.fromRGB(200,30,30), accent2=Color3.fromRGB(30,160,60), text=Color3.fromRGB(240,235,220), subtle=Color3.fromRGB(140,170,150), success=Color3.fromRGB(60,200,110), warn=Color3.fromRGB(255,210,110), danger=Color3.fromRGB(255,80,90)},
 }
-local colors = themes.Midnight
+local colors = themes.Christmas
 
 -- Config
 local config = {
@@ -60,7 +61,7 @@ local config = {
         {name="High Point", pos=Vector3.new(0,50,0)},
     },
     webhookUrl = "",
-    theme = "Midnight",
+    theme = "Christmas",
     keybinds = {toggleUI=Enum.KeyCode.L, panic=Enum.KeyCode.RightControl, toggleAimbot=Enum.KeyCode.F1, toggleESP=Enum.KeyCode.F2, toggleFly=Enum.KeyCode.F3, toggleNoclip=Enum.KeyCode.F4},
     presets = {
         legit   = {ws=24, jp=70, fov=75, aimbot=false, esp=true},
@@ -157,7 +158,58 @@ local function autoLoadConfig()
     end
 end
 
--- UI builders (more to be added later)
+-- UI builders
+local function makeToggle(parent,label,cb,defaultState)
+    local f=Instance.new("Frame"); f.Size=UDim2.new(1,-10,0,40); f.BackgroundColor3=colors.panel; f.BorderSizePixel=0; makeCorner(f,10); f.Parent=parent
+    local l=Instance.new("TextLabel"); l.BackgroundTransparency=1; l.Size=UDim2.new(1,-90,1,0); l.Position=UDim2.new(0,12,0,0); l.Font=Enum.Font.Gotham; l.TextColor3=colors.text; l.TextSize=15; l.TextXAlignment=Enum.TextXAlignment.Left; l.Text=label; l.Parent=f
+    local btn=Instance.new("TextButton"); btn.Size=UDim2.fromOffset(70,24); btn.Position=UDim2.new(1,-80,0.5,-12); btn.BackgroundColor3=colors.bg; btn.BorderSizePixel=0; btn.AutoButtonColor=false; btn.Text="Off"; btn.TextColor3=colors.text; btn.Font=Enum.Font.GothamSemibold; btn.TextSize=13; makeCorner(btn,12); btn.Parent=f
+    local knob=Instance.new("Frame"); knob.Size=UDim2.fromOffset(20,20); knob.Position=UDim2.new(0,2,0.5,-10); knob.BackgroundColor3=colors.subtle; knob.BorderSizePixel=0; makeCorner(knob,20); knob.Parent=btn
+    local on=defaultState or false
+    local function set(state)
+        on=state
+        btn.Text = on and "On" or "Off"
+        tween(btn,0.16,{BackgroundColor3=on and colors.accent or colors.bg})
+        tween(knob,0.16,{Position=on and UDim2.new(1,-22,0.5,-10) or UDim2.new(0,2,0.5,-10), BackgroundColor3=on and Color3.new(1,1,1) or colors.subtle})
+        if logLabel then logLabel.Text = string.format("%s: %s", label, on and "On" or "Off") end
+        if cb then task.spawn(function() cb(on) end) end
+    end
+    btn.MouseButton1Click:Connect(function() ripple(btn); set(not on); log("toggle",label.."="..tostring(not on)) end)
+    set(on); return set
+end
+
+local function makeButton(parent,label,cb)
+    local b=Instance.new("TextButton"); b.Size=UDim2.new(1,-10,0,40); b.BackgroundColor3=colors.panel; b.BorderSizePixel=0; b.AutoButtonColor=false
+    b.Font=Enum.Font.GothamSemibold; b.TextColor3=colors.text; b.TextSize=15; b.Text=label; makeCorner(b,10); b.Parent=parent
+    b.MouseEnter:Connect(function() tween(b,0.08,{BackgroundColor3=colors.accent2}) end)
+    b.MouseLeave:Connect(function() tween(b,0.08,{BackgroundColor3=colors.panel}) end)
+    b.MouseButton1Click:Connect(function() ripple(b); if cb then task.spawn(cb) end end)
+    return b
+end
+
+local function makeSlider(parent,label,min,max,default,cb)
+    local f=Instance.new("Frame"); f.Size=UDim2.new(1,-10,0,44); f.BackgroundColor3=colors.panel; f.BorderSizePixel=0; makeCorner(f,10); f.Parent=parent
+    local l=Instance.new("TextLabel"); l.BackgroundTransparency=1; l.Size=UDim2.new(0.5,-10,1,0); l.Position=UDim2.new(0,12,0,0); l.Font=Enum.Font.Gotham; l.TextColor3=colors.text; l.TextSize=14; l.TextXAlignment=Enum.TextXAlignment.Left; l.Text=label; l.Parent=f
+    local value=Instance.new("TextLabel"); value.BackgroundTransparency=1; value.Size=UDim2.new(0.5,-10,1,0); value.Position=UDim2.new(0.5,0,0,0); value.Font=Enum.Font.GothamSemibold; value.TextColor3=colors.text; value.TextSize=14; value.TextXAlignment=Enum.TextXAlignment.Right; value.Text=tostring(default); value.Parent=f
+    local bar=Instance.new("Frame"); bar.Size=UDim2.new(1,-24,0,6); bar.Position=UDim2.new(0,12,1,-12); bar.BackgroundColor3=colors.bg; bar.BorderSizePixel=0; makeCorner(bar,6); bar.Parent=f
+    local fill=Instance.new("Frame"); fill.Size=UDim2.new((default-min)/(max-min),0,1,0); fill.BackgroundColor3=colors.accent; fill.BorderSizePixel=0; makeCorner(fill,6); fill.Parent=bar
+    local dragging=false
+    local function setVal(v)
+        v=math.clamp(v,min,max); value.Text=tostring(math.floor(v*100)/100); tween(fill,0.1,{Size=UDim2.new((v-min)/(max-min),0,1,0)}); if cb then task.spawn(function() cb(v) end) end
+    end
+    bar.InputBegan:Connect(function(inp) if inp.UserInputType==Enum.UserInputType.MouseButton1 then dragging=true; setVal(min+(max-min)*((UserInputService:GetMouseLocation().X-bar.AbsolutePosition.X)/bar.AbsoluteSize.X)) end end)
+    bar.InputEnded:Connect(function(inp) if inp.UserInputType==Enum.UserInputType.MouseButton1 then dragging=false end end)
+    UserInputService.InputChanged:Connect(function(inp) if dragging and inp.UserInputType==Enum.UserInputType.MouseMovement then setVal(min+(max-min)*((UserInputService:GetMouseLocation().X-bar.AbsolutePosition.X)/bar.AbsoluteSize.X)) end end)
+    setVal(default); return setVal
+end
+
+local function makeDropdown(parent,label,options,cb)
+    local f=Instance.new("Frame"); f.Size=UDim2.new(1,-10,0,40); f.BackgroundColor3=colors.panel; f.BorderSizePixel=0; makeCorner(f,10); f.Parent=parent
+    local l=Instance.new("TextLabel"); l.BackgroundTransparency=1; l.Size=UDim2.new(0.5,-10,1,0); l.Position=UDim2.new(0,12,0,0); l.Font=Enum.Font.Gotham; l.TextColor3=colors.text; l.TextSize=15; l.TextXAlignment=Enum.TextXAlignment.Left; l.Text=label; l.Parent=f
+    local btn=Instance.new("TextButton"); btn.Size=UDim2.new(0.5,-20,1,-8); btn.Position=UDim2.new(0.5,8,0,4); btn.BackgroundColor3=colors.bg; btn.BorderSizePixel=0; btn.TextColor3=colors.text; btn.Font=Enum.Font.GothamSemibold; btn.TextSize=14; btn.Text=options[1] or "Select"; makeCorner(btn,8); btn.Parent=f
+    local function set(val) btn.Text=val; if cb then cb(val) end end
+    btn.MouseButton1Click:Connect(function() ripple(btn); local next=1; for i,opt in ipairs(options) do if opt==btn.Text then next=i%#options+1 end end; set(options[next]) end)
+    set(options[1]); return set
+end
 
 -- ESP helpers
 local function clearESP()
@@ -219,13 +271,30 @@ Players.PlayerAdded:Connect(function(p) p.CharacterAdded:Connect(function() if c
 
 -- GUI root
 local gui = Instance.new("ScreenGui"); gui.Name="AdvancedMenu"; gui.ResetOnSpawn=false; gui.Parent=game:GetService("CoreGui")
-local main = Instance.new("Frame"); main.Size=UDim2.fromOffset(640, 480); main.Position=UDim2.new(0.5,-320,0.5,-240); main.BackgroundColor3=colors.bg; main.BorderSizePixel=0; main.Active=true; main.Draggable=true; main.Parent=gui; makeCorner(main,12)
+local mainWidth, mainHeight = 640, 480
+local main = Instance.new("Frame"); main.Size=UDim2.fromOffset(mainWidth, mainHeight); main.Position=UDim2.new(0.5,-mainWidth/2,0.5,-mainHeight/2); main.BackgroundColor3=colors.bg; main.BorderSizePixel=0; main.Active=true; main.Draggable=true; main.Parent=gui; makeCorner(main,12)
+local function setMainSize(w,h)
+    mainWidth, mainHeight = w,h
+    main.Size = UDim2.fromOffset(w,h)
+    main.Position = UDim2.new(0.5,-w/2,0.5,-h/2)
+end
 local grad=Instance.new("UIGradient",main); grad.Color=ColorSequence.new{ColorSequenceKeypoint.new(0,colors.bg),ColorSequenceKeypoint.new(1,colors.accent2)}; grad.Rotation=60
 
 -- Title
 local title=Instance.new("Frame"); title.Size=UDim2.new(1,0,0,46); title.BackgroundColor3=colors.panel; title.BorderSizePixel=0; title.Parent=main; makeCorner(title,12)
-local titleLabel=Instance.new("TextLabel"); titleLabel.Size=UDim2.new(1,-170,1,0); titleLabel.Position=UDim2.new(0,16,0,0); titleLabel.BackgroundTransparency=1; titleLabel.Font=Enum.Font.GothamBold; titleLabel.Text="Advanced Universal Hub v"..config.version; titleLabel.TextColor3=colors.text; titleLabel.TextSize=18; titleLabel.TextXAlignment=Enum.TextXAlignment.Left; titleLabel.Parent=title
-local versionLabel=Instance.new("TextLabel"); versionLabel.Size=UDim2.new(0,140,1,0); versionLabel.Position=UDim2.new(1,-150,0,0); versionLabel.BackgroundTransparency=1; versionLabel.Font=Enum.Font.Gotham; versionLabel.Text="v"..config.version; versionLabel.TextColor3=colors.subtle; versionLabel.TextSize=14; versionLabel.TextXAlignment=Enum.TextXAlignment.Right; versionLabel.Parent=title
+local titleLabel=Instance.new("TextLabel"); titleLabel.Size=UDim2.new(1,-170,1,0); titleLabel.Position=UDim2.new(0,16,0,0); titleLabel.BackgroundTransparency=1; titleLabel.Font=Enum.Font.GothamBold; titleLabel.Text="Ninnydll"; titleLabel.TextColor3=Color3.fromRGB(255,215,120); titleLabel.TextSize=18; titleLabel.TextXAlignment=Enum.TextXAlignment.Left; titleLabel.Parent=title
+task.spawn(function()
+    local gold1 = Color3.fromRGB(255,215,120)
+    local gold2 = Color3.fromRGB(255,235,170)
+    while titleLabel.Parent do
+        tween(titleLabel,0.8,{TextColor3=gold2}):Play()
+        task.wait(0.8)
+        tween(titleLabel,0.8,{TextColor3=gold1}):Play()
+        task.wait(0.8)
+    end
+end)
+local versionLabel=Instance.new("TextLabel"); versionLabel.Size=UDim2.new(0,70,1,0); versionLabel.Position=UDim2.new(1,-80,0,0); versionLabel.BackgroundTransparency=1; versionLabel.Font=Enum.Font.Gotham; versionLabel.Text="v"..config.version; versionLabel.TextColor3=colors.subtle; versionLabel.TextSize=13; versionLabel.TextXAlignment=Enum.TextXAlignment.Right; versionLabel.Parent=title
+local logLabel=Instance.new("TextLabel"); logLabel.Size=UDim2.new(0,180,1,0); logLabel.Position=UDim2.new(1,-260,0,0); logLabel.BackgroundTransparency=1; logLabel.Font=Enum.Font.GothamSemibold; logLabel.Text="Logs ready"; logLabel.TextColor3=colors.warn; logLabel.TextSize=13; logLabel.TextXAlignment=Enum.TextXAlignment.Right; logLabel.Parent=title
 
 -- Status bar
 local statusLabel=Instance.new("TextLabel"); statusLabel.BackgroundTransparency=1; statusLabel.Size=UDim2.new(0, 220, 0, 20); statusLabel.Position=UDim2.new(1,-230,0,48); statusLabel.Font=Enum.Font.Gotham; statusLabel.TextColor3=colors.subtle; statusLabel.TextSize=13; statusLabel.TextXAlignment=Enum.TextXAlignment.Right; statusLabel.Parent=main
@@ -411,7 +480,7 @@ do
     makeButton(p,"Copy Config to Clipboard",function() if setclipboard then setclipboard(HttpService:JSONEncode(config)); toast("Config copied") else toast("setclipboard not available") end end)
     makeButton(p,"Create/Save Config (Desktop/ADVHub)",function() saveConfigToFile("Config_"..tostring(os.time())) end)
     makeButton(p,"Load Config File",function() toast("Use console: loadConfigFromFile('name')") end)
-    makeDropdown(p,"Theme",{"Midnight","NeoGreen","Amber","Purple"},function(v) config.theme=v; applyTheme() end)
+    makeDropdown(p,"Theme",{"Christmas","Midnight","NeoGreen","Amber","Purple"},function(v) config.theme=v; applyTheme() end)
     makeButton(p,"Apply Preset: Legit",function() local t=config.presets.legit; config.wsBoost=t.ws; config.jpBoost=t.jp; camera.FieldOfView=t.fov; config.aimbotEnabled=t.aimbot; config.esp.enabled=t.esp; toast("Legit preset applied") end)
     makeButton(p,"Apply Preset: Rage",function() local t=config.presets.rage; config.wsBoost=t.ws; config.jpBoost=t.jp; camera.FieldOfView=t.fov; config.aimbotEnabled=t.aimbot; config.esp.enabled=t.esp; toast("Rage preset applied") end)
     makeButton(p,"Apply Preset: Visuals",function() local t=config.presets.visuals; camera.FieldOfView=t.fov; config.aimbotEnabled=t.aimbot; config.esp.enabled=t.esp; toast("Visuals preset applied") end)
@@ -431,8 +500,10 @@ end
 -- UI / Theme
 do
     local p=pages["UI / Theme"]
-    makeDropdown(p,"Theme",{"Midnight","NeoGreen","Amber","Purple"},function(v) config.theme=v; applyTheme() end)
+    makeDropdown(p,"Theme",{"Christmas","Midnight","NeoGreen","Amber","Purple"},function(v) config.theme=v; applyTheme() end)
     makeSlider(p,"Menu Opacity",0.5,1,config.uiOpacity,function(v) config.uiOpacity=v; applyOpacity(main) end)
+    makeSlider(p,"Menu Width",520,820,mainWidth,function(v) setMainSize(v, mainHeight) end)
+    makeSlider(p,"Menu Height",360,640,mainHeight,function(v) setMainSize(mainWidth, v) end)
     makeToggle(p,"UI Animations",function(on) config.animations=on end,true)
     makeToggle(p,"UI Sounds",function(on) config.uiSounds=on end,false)
     makeButton(p,"Changelog",function() toast("v5.2: scrollable UI, ESP colors, status HUD, config save/load, opacity controls") end)
