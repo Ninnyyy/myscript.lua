@@ -1,4 +1,4 @@
-# Advanced Control Panel (v4.3) — Universal Roblox Client Script
+# Advanced Control Panel (v5.1) — Universal Roblox Client Script
 
 A universal client-side control panel for Roblox executors. It builds an animated dark UI with movement tools, ESP, aimbot, utility actions, config import/export, and optional Discord webhook logging.
 
