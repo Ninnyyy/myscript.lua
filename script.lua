@@ -41,10 +41,15 @@ local config = {
     triggerEnabled = false,
     aimbotMode = "Nearest Crosshair",
     aimbotArea = "Head",
+    silentAim = false,
     esp = {
         enabled=false, names=true, distance=true, arrows=true, healthbar=true, boxes=true, tracers=true, items=false, teamColors=true,
         colors = {accent=Color3.fromRGB(0,145,255), outline=Color3.fromRGB(0,110,200), box=Color3.fromRGB(0,145,255), tracer=Color3.fromRGB(0,145,255), preset="Blue"},
         worldTags={"Chest","Coin","Key"},
+        opacity = 0.6,
+        thicknessBox = 2,
+        thicknessTracer = 2,
+        nameFilter = "",
     },
     flySpeed = 75,
     wsBoost = 28,
@@ -71,7 +76,29 @@ local config = {
     autoDisableOnTP = false,
     stopOnPanic = true,
     uiBlur = false,
+    blurSize = 8,
     uiOpacity = 1,
+    menuW = 640,
+    menuH = 480,
+    compact = false,
+    lastConfig = "",
+    disableInVIP = false,
+    aimbotSkipFriends = true,
+    aimbotLegitDecay = false,
+    overlayToggleKey = Enum.KeyCode.F6,
+    solidTheme = false,
+    snow = false,
+    showQuickbar = true,
+    lastPreset = "",
+    friendWhitelist = {},
+    autoExec = {},
+    autoExecEnabled = false,
+    avoidLowHealth = false,
+    stickTarget = false,
+    rankedStop = false,
+    defaultFov = 70,
+    autoInteractFilter = "",
+    gamePreset = "",
 }
 local hidden = false
 
@@ -81,6 +108,7 @@ local jpDefault = Hum.JumpPower
 local gravityDefault = workspace.Gravity
 local connections = {}
 local highlightObjects, nametagObjects, arrowObjects, tracerObjects = {}, {}, {}, {}
+local worldHighlights = {}
 local blurEffect
 local flyEnabled, flyBV = false, nil
 local noclipEnabled = false
@@ -111,9 +139,10 @@ local function log(event,data)
         pcall(function() http_request({Url=config.webhookUrl,Method="POST",Headers={["Content-Type"]="application/json"},Body=payload}) end)
     end)
 end
-local function setBlur(on)
+local function setBlur(on, size)
     if on then
-        if not blurEffect then blurEffect=Instance.new("BlurEffect"); blurEffect.Size=10; blurEffect.Parent=Lighting end
+        if not blurEffect then blurEffect=Instance.new("BlurEffect"); blurEffect.Parent=Lighting end
+        blurEffect.Size = size or config.blurSize or 8
     else
         if blurEffect then blurEffect:Destroy(); blurEffect=nil end
     end
@@ -122,7 +151,7 @@ local function applyTheme() colors = themes[config.theme] or colors end
 local function applyOpacity(guiObj)
     for _,obj in ipairs(guiObj:GetDescendants()) do
         if obj:IsA("Frame") or obj:IsA("TextButton") or obj:IsA("TextLabel") then
-            obj.BackgroundTransparency = math.clamp(obj.BackgroundTransparency + (1-config.uiOpacity), 0, 1)
+            obj.BackgroundTransparency = 1 - config.uiOpacity
             if obj:IsA("TextLabel") or obj:IsA("TextButton") then obj.TextTransparency = 1 - config.uiOpacity end
         end
     end
@@ -158,11 +187,25 @@ local function autoLoadConfig()
     end
 end
 
+local function listConfigs()
+    local files = {}
+    if listfiles and isfolder and isfolder("ADVHub") then
+        for _,f in ipairs(listfiles("ADVHub")) do
+            local name = f:match("ADVHub[/\\](.+)%.json$")
+            if name then table.insert(files, name) end
+        end
+    end
+    table.sort(files)
+    if #files==0 then table.insert(files,"None") end
+    return files
+end
+
 -- UI builders
 local function makeToggle(parent,label,cb,defaultState)
-    local f=Instance.new("Frame"); f.Size=UDim2.new(1,-10,0,40); f.BackgroundColor3=colors.panel; f.BorderSizePixel=0; makeCorner(f,10); f.Parent=parent
+    local h = config.compact and 34 or 40
+    local f=Instance.new("Frame"); f.Size=UDim2.new(1,-10,0,h); f.BackgroundColor3=colors.panel; f.BorderSizePixel=0; makeCorner(f,10); f.Parent=parent
     local l=Instance.new("TextLabel"); l.BackgroundTransparency=1; l.Size=UDim2.new(1,-90,1,0); l.Position=UDim2.new(0,12,0,0); l.Font=Enum.Font.Gotham; l.TextColor3=colors.text; l.TextSize=15; l.TextXAlignment=Enum.TextXAlignment.Left; l.Text=label; l.Parent=f
-    local btn=Instance.new("TextButton"); btn.Size=UDim2.fromOffset(70,24); btn.Position=UDim2.new(1,-80,0.5,-12); btn.BackgroundColor3=colors.bg; btn.BorderSizePixel=0; btn.AutoButtonColor=false; btn.Text="Off"; btn.TextColor3=colors.text; btn.Font=Enum.Font.GothamSemibold; btn.TextSize=13; makeCorner(btn,12); btn.Parent=f
+    local btn=Instance.new("TextButton"); btn.Size=UDim2.fromOffset(70,config.compact and 22 or 24); btn.Position=UDim2.new(1,-80,0.5,-(config.compact and 11 or 12)); btn.BackgroundColor3=colors.bg; btn.BorderSizePixel=0; btn.AutoButtonColor=false; btn.Text="Off"; btn.TextColor3=colors.text; btn.Font=Enum.Font.GothamSemibold; btn.TextSize=13; makeCorner(btn,12); btn.Parent=f
     local knob=Instance.new("Frame"); knob.Size=UDim2.fromOffset(20,20); knob.Position=UDim2.new(0,2,0.5,-10); knob.BackgroundColor3=colors.subtle; knob.BorderSizePixel=0; makeCorner(knob,20); knob.Parent=btn
     local on=defaultState or false
     local function set(state)
@@ -170,7 +213,7 @@ local function makeToggle(parent,label,cb,defaultState)
         btn.Text = on and "On" or "Off"
         tween(btn,0.16,{BackgroundColor3=on and colors.accent or colors.bg})
         tween(knob,0.16,{Position=on and UDim2.new(1,-22,0.5,-10) or UDim2.new(0,2,0.5,-10), BackgroundColor3=on and Color3.new(1,1,1) or colors.subtle})
-        if logLabel then logLabel.Text = string.format("%s: %s", label, on and "On" or "Off") end
+        pushLog(string.format("%s: %s", label, on and "On" or "Off"))
         if cb then task.spawn(function() cb(on) end) end
     end
     btn.MouseButton1Click:Connect(function() ripple(btn); set(not on); log("toggle",label.."="..tostring(not on)) end)
@@ -187,7 +230,8 @@ local function makeButton(parent,label,cb)
 end
 
 local function makeSlider(parent,label,min,max,default,cb)
-    local f=Instance.new("Frame"); f.Size=UDim2.new(1,-10,0,44); f.BackgroundColor3=colors.panel; f.BorderSizePixel=0; makeCorner(f,10); f.Parent=parent
+    local h = config.compact and 38 or 44
+    local f=Instance.new("Frame"); f.Size=UDim2.new(1,-10,0,h); f.BackgroundColor3=colors.panel; f.BorderSizePixel=0; makeCorner(f,10); f.Parent=parent
     local l=Instance.new("TextLabel"); l.BackgroundTransparency=1; l.Size=UDim2.new(0.5,-10,1,0); l.Position=UDim2.new(0,12,0,0); l.Font=Enum.Font.Gotham; l.TextColor3=colors.text; l.TextSize=14; l.TextXAlignment=Enum.TextXAlignment.Left; l.Text=label; l.Parent=f
     local value=Instance.new("TextLabel"); value.BackgroundTransparency=1; value.Size=UDim2.new(0.5,-10,1,0); value.Position=UDim2.new(0.5,0,0,0); value.Font=Enum.Font.GothamSemibold; value.TextColor3=colors.text; value.TextSize=14; value.TextXAlignment=Enum.TextXAlignment.Right; value.Text=tostring(default); value.Parent=f
     local bar=Instance.new("Frame"); bar.Size=UDim2.new(1,-24,0,6); bar.Position=UDim2.new(0,12,1,-12); bar.BackgroundColor3=colors.bg; bar.BorderSizePixel=0; makeCorner(bar,6); bar.Parent=f
@@ -219,6 +263,11 @@ local function clearESP()
     highlightObjects,nametagObjects,arrowObjects,tracerObjects = {},{},{},{}
 end
 
+local function clearWorldESP()
+    for _,o in ipairs(worldHighlights) do o:Destroy() end
+    worldHighlights = {}
+end
+
 local function applyEspPreset(name)
     local presets = {
         Blue   = {accent=Color3.fromRGB(0,145,255), outline=Color3.fromRGB(0,110,200), box=Color3.fromRGB(0,145,255), tracer=Color3.fromRGB(0,145,255)},
@@ -238,7 +287,8 @@ function addESP(plr)
     if not hrp then return end
     local c = config.esp.colors
     local fillColor = config.esp.teamColors and plr.TeamColor and plr.TeamColor.Color or c.accent
-    local h=Instance.new("Highlight"); h.FillColor=fillColor; h.OutlineColor=c.outline; h.Adornee=char; h.DepthMode=Enum.HighlightDepthMode.AlwaysOnTop; h.Parent=char; table.insert(highlightObjects,h)
+    local opacity = config.esp.opacity or 0.6
+    local h=Instance.new("Highlight"); h.FillColor=fillColor; h.OutlineColor=c.outline; h.FillTransparency=1-opacity; h.OutlineTransparency=1-opacity; h.Adornee=char; h.DepthMode=Enum.HighlightDepthMode.AlwaysOnTop; h.Parent=char; table.insert(highlightObjects,h)
     if config.esp.names then
         local bill=Instance.new("BillboardGui"); bill.AlwaysOnTop=true; bill.Size=UDim2.new(0,200,0,40); bill.Adornee=hrp; bill.Parent=char
         local txt=Instance.new("TextLabel"); txt.BackgroundTransparency=1; txt.Size=UDim2.new(1,0,1,0); txt.Font=Enum.Font.GothamSemibold; txt.TextColor3=colors.text; txt.TextStrokeTransparency=0.4; txt.TextStrokeColor3=colors.bg; txt.TextSize=14; txt.Text=plr.Name; txt.Parent=bill
@@ -253,7 +303,8 @@ function addESP(plr)
         table.insert(nametagObjects,bill)
     end
     if config.esp.arrows then
-        local arrow=Instance.new("Frame"); arrow.Size=UDim2.fromOffset(18,18); arrow.BackgroundColor3=c.tracer; arrow.BorderSizePixel=0; arrow.AnchorPoint=Vector2.new(0.5,0.5); arrow.Position=UDim2.new(0.5,0,0.5,0); arrow.Parent=offscreenGui; makeCorner(arrow,9); table.insert(arrowObjects,arrow)
+        local th = config.esp.thicknessTracer or 2
+        local arrow=Instance.new("Frame"); arrow.Size=UDim2.fromOffset(12+th*3,12+th*3); arrow.BackgroundColor3=c.tracer; arrow.BackgroundTransparency=1-opacity; arrow.BorderSizePixel=0; arrow.AnchorPoint=Vector2.new(0.5,0.5); arrow.Position=UDim2.new(0.5,0,0.5,0); arrow.Parent=offscreenGui; makeCorner(arrow,9); table.insert(arrowObjects,arrow)
         RunService.RenderStepped:Connect(function()
             if not hrp or not HRP then return end
             local pos,on=camera:WorldToViewportPoint(hrp.Position)
@@ -271,10 +322,11 @@ Players.PlayerAdded:Connect(function(p) p.CharacterAdded:Connect(function() if c
 
 -- GUI root
 local gui = Instance.new("ScreenGui"); gui.Name="AdvancedMenu"; gui.ResetOnSpawn=false; gui.Parent=game:GetService("CoreGui")
-local mainWidth, mainHeight = 640, 480
+local mainWidth, mainHeight = config.menuW or 640, config.menuH or 480
 local main = Instance.new("Frame"); main.Size=UDim2.fromOffset(mainWidth, mainHeight); main.Position=UDim2.new(0.5,-mainWidth/2,0.5,-mainHeight/2); main.BackgroundColor3=colors.bg; main.BorderSizePixel=0; main.Active=true; main.Draggable=true; main.Parent=gui; makeCorner(main,12)
 local function setMainSize(w,h)
     mainWidth, mainHeight = w,h
+    config.menuW, config.menuH = w,h
     main.Size = UDim2.fromOffset(w,h)
     main.Position = UDim2.new(0.5,-w/2,0.5,-h/2)
 end
@@ -295,6 +347,9 @@ task.spawn(function()
 end)
 local versionLabel=Instance.new("TextLabel"); versionLabel.Size=UDim2.new(0,70,1,0); versionLabel.Position=UDim2.new(1,-80,0,0); versionLabel.BackgroundTransparency=1; versionLabel.Font=Enum.Font.Gotham; versionLabel.Text="v"..config.version; versionLabel.TextColor3=colors.subtle; versionLabel.TextSize=13; versionLabel.TextXAlignment=Enum.TextXAlignment.Right; versionLabel.Parent=title
 local logLabel=Instance.new("TextLabel"); logLabel.Size=UDim2.new(0,180,1,0); logLabel.Position=UDim2.new(1,-260,0,0); logLabel.BackgroundTransparency=1; logLabel.Font=Enum.Font.GothamSemibold; logLabel.Text="Logs ready"; logLabel.TextColor3=colors.warn; logLabel.TextSize=13; logLabel.TextXAlignment=Enum.TextXAlignment.Right; logLabel.Parent=title
+local function pushLog(msg)
+    if logLabel then logLabel.Text = msg end
+end
 
 -- Status bar
 local statusLabel=Instance.new("TextLabel"); statusLabel.BackgroundTransparency=1; statusLabel.Size=UDim2.new(0, 220, 0, 20); statusLabel.Position=UDim2.new(1,-230,0,48); statusLabel.Font=Enum.Font.Gotham; statusLabel.TextColor3=colors.subtle; statusLabel.TextSize=13; statusLabel.TextXAlignment=Enum.TextXAlignment.Right; statusLabel.Parent=main
@@ -322,6 +377,18 @@ for _,name in ipairs(tabNames) do
     pages[name]=page
 end
 local tabButtons={}
+local tabColors = {
+    ["Dashboard"]=colors.accent,
+    ["Movement"]=Color3.fromRGB(30,160,90),
+    ["Visuals"]=Color3.fromRGB(60,140,255),
+    ["Combat"]=Color3.fromRGB(220,70,70),
+    ["Automation"]=Color3.fromRGB(200,140,60),
+    ["Player List"]=Color3.fromRGB(120,200,255),
+    ["Script Hub"]=Color3.fromRGB(200,140,255),
+    ["Configs"]=Color3.fromRGB(120,180,200),
+    ["Protection"]=Color3.fromRGB(180,160,80),
+    ["UI / Theme"]=Color3.fromRGB(120,180,120),
+}
 local tabIndicator=Instance.new("Frame"); tabIndicator.Size=UDim2.new(0,6,0,36); tabIndicator.BackgroundColor3=colors.accent; tabIndicator.BorderSizePixel=0; tabIndicator.Visible=false; tabIndicator.Parent=tabs; makeCorner(tabIndicator,3)
 local function switchTab(name)
     for tabName,page in pairs(pages) do page.Visible=(tabName==name) end
@@ -333,8 +400,8 @@ local function createTabButton(name)
     b.MouseLeave:Connect(function() if selectedTab~=name then tween(b,0.12,{BackgroundColor3=colors.bg}) end end)
     b.MouseButton1Click:Connect(function()
         ripple(b); switchTab(name)
-        for other,btn in pairs(tabButtons) do tween(btn,0.2,{BackgroundColor3=(other==name) and colors.accent or colors.bg}) end
-        tabIndicator.Visible=true; tween(tabIndicator,0.2,{Position=UDim2.new(0,4,0,b.Position.Y.Offset),BackgroundColor3=colors.accent})
+        for other,btn in pairs(tabButtons) do tween(btn,0.2,{BackgroundColor3=(other==name) and (tabColors[name] or colors.accent) or colors.bg}) end
+        tabIndicator.Visible=true; tween(tabIndicator,0.2,{Position=UDim2.new(0,4,0,b.Position.Y.Offset),BackgroundColor3=tabColors[name] or colors.accent})
     end)
     return b
 end
@@ -391,6 +458,11 @@ do
     makeToggle(p,"ESP Healthbar",function(on) config.esp.healthbar=on end,config.esp.healthbar)
     makeToggle(p,"ESP Team Colors",function(on) config.esp.teamColors=on; clearESP(); if config.esp.enabled then for _,pl in ipairs(Players:GetPlayers()) do addESP(pl) end end end,config.esp.teamColors)
     makeDropdown(p,"ESP Color Preset",{"Blue","Red","Green","Purple","Gold"},applyEspPreset)
+    makeSlider(p,"Box Thickness",1,6,config.esp.thicknessBox or 2,function(v) config.esp.thicknessBox=v; clearESP(); if config.esp.enabled then for _,pl in ipairs(Players:GetPlayers()) do addESP(pl) end end end)
+    makeSlider(p,"Tracer Thickness",1,6,config.esp.thicknessTracer or 2,function(v) config.esp.thicknessTracer=v; clearESP(); if config.esp.enabled then for _,pl in ipairs(Players:GetPlayers()) do addESP(pl) end end end)
+    makeSlider(p,"ESP Opacity",0.2,1,config.esp.opacity or 0.6,function(v) config.esp.opacity=v; clearESP(); if config.esp.enabled then for _,pl in ipairs(Players:GetPlayers()) do addESP(pl) end end end)
+    local filterBox=Instance.new("TextBox"); filterBox.Size=UDim2.new(1,-10,0,36); filterBox.BackgroundColor3=colors.bg; filterBox.TextColor3=colors.text; filterBox.PlaceholderText="World ESP name filter (comma separated)"; filterBox.Text=config.esp.nameFilter or ""; filterBox.BorderSizePixel=0; filterBox.Font=Enum.Font.Gotham; filterBox.TextSize=14; makeCorner(filterBox,8); filterBox.Parent=p
+    filterBox.FocusLost:Connect(function() config.esp.nameFilter=filterBox.Text end)
     makeSlider(p,"Camera FOV",40,120,config.fov,function(v) config.fov=v; camera.FieldOfView=v end)
     makeToggle(p,"Fullbright",function(on) config.fullbright=on; if on then Lighting.Brightness=2; Lighting.Ambient=Color3.new(1,1,1); Lighting.OutdoorAmbient=Color3.new(1,1,1) else Lighting.Brightness=1; Lighting.Ambient=Color3.new(0,0,0); Lighting.OutdoorAmbient=Color3.new(0,0,0) end end,false)
     makeToggle(p,"No Fog",function(on) config.noFog=on; if on then Lighting.FogEnd=1e9 else Lighting.FogEnd=1000 end end,false)
@@ -404,11 +476,17 @@ local function getClosestTarget()
     local closest, dist=nil, math.huge
     for _,plr in ipairs(Players:GetPlayers()) do
         if plr~=LP and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") and plr.Character:FindFirstChildOfClass("Humanoid").Health>0 then
-            local pos,on=camera:WorldToViewportPoint(plr.Character.HumanoidRootPart.Position)
-            if on then
-                local mouse=UserInputService:GetMouseLocation()
-                local d=(Vector2.new(pos.X,pos.Y)-mouse).Magnitude
-                if d<dist and d<=config.aimbotFov then closest=plr; dist=d end
+            local skip=false
+            if config.aimbotSkipFriends and LP:IsFriendsWith(plr.UserId) then skip=true end
+            for _,name in ipairs(config.friendWhitelist) do if plr.Name:lower()==tostring(name):lower() then skip=true end end
+            if config.avoidLowHealth and plr.Character:FindFirstChildOfClass("Humanoid") and plr.Character:FindFirstChildOfClass("Humanoid").Health < 20 then skip=true end
+            if not skip then
+                local pos,on=camera:WorldToViewportPoint(plr.Character.HumanoidRootPart.Position)
+                if on then
+                    local mouse=UserInputService:GetMouseLocation()
+                    local d=(Vector2.new(pos.X,pos.Y)-mouse).Magnitude
+                    if d<dist and d<=config.aimbotFov then closest=plr; dist=d end
+                end
             end
         end
     end
@@ -425,6 +503,11 @@ do
     makeSlider(p,"Aimbot Smooth",0.01,0.5,config.aimbotSmooth,function(v) config.aimbotSmooth=v end)
     makeToggle(p,"FOV Circle",function(on) fovCircle.Visible=on end,true)
     makeToggle(p,"Triggerbot",function(on) config.triggerEnabled=on end)
+    makeToggle(p,"Skip Friends",function(on) config.aimbotSkipFriends=on end,config.aimbotSkipFriends)
+    makeToggle(p,"Legit FOV Decay",function(on) config.aimbotLegitDecay=on end,config.aimbotLegitDecay)
+    makeToggle(p,"Avoid Low Health Targets",function(on) config.avoidLowHealth=on end, config.avoidLowHealth)
+    makeToggle(p,"Stick to Last Target",function(on) config.stickTarget=on end, config.stickTarget)
+    makeToggle(p,"Silent Aim",function(on) config.silentAim=on end, config.silentAim)
     makeButton(p,"Reset Camera FOV",function() camera.FieldOfView=70 end)
 end
 
@@ -469,23 +552,120 @@ end
 -- Script Hub (stub)
 do
     local p=pages["Script Hub"]
-    local desc=Instance.new("TextLabel"); desc.BackgroundTransparency=1; desc.Size=UDim2.new(1,-10,0,40); desc.Font=Enum.Font.Gotham; desc.TextColor3=colors.text; desc.TextSize=14; desc.TextWrapped=true; desc.Text="Script Hub stub: add your own URLs/functions."; desc.Parent=p
-    makeButton(p,"Execute Universal Script (placeholder)",function() toast("Run your universal script here") end)
-    makeButton(p,"Load Game Module",function() toast("No module present; add your own logic") end)
+    local desc=Instance.new("TextLabel"); desc.BackgroundTransparency=1; desc.Size=UDim2.new(1,-10,0,40); desc.Font=Enum.Font.Gotham; desc.TextColor3=colors.text; desc.TextSize=14; desc.TextWrapped=true; desc.Text="Script Hub: favorites + auto-exec per game."; desc.Parent=p
+    local execBox=Instance.new("TextBox"); execBox.Size=UDim2.new(1,-10,0,100); execBox.BackgroundColor3=colors.bg; execBox.TextColor3=colors.text; execBox.PlaceholderText="Paste script URL or code stub"; execBox.Text=""; execBox.ClearTextOnFocus=false; execBox.TextWrapped=true; execBox.TextXAlignment=Enum.TextXAlignment.Left; execBox.TextYAlignment=Enum.TextYAlignment.Top; execBox.BorderSizePixel=0; execBox.Font=Enum.Font.Gotham; execBox.TextSize=14; makeCorner(execBox,8); execBox.Parent=p
+    makeButton(p,"Run Script",function() toast("Run your universal script here") end)
+    makeToggle(p,"Auto-Exec (all games)",function(on) config.autoExecEnabled=on end, config.autoExecEnabled)
+    local autoBox=Instance.new("TextBox"); autoBox.Size=UDim2.new(1,-10,0,80); autoBox.BackgroundColor3=colors.bg; autoBox.TextColor3=colors.text; autoBox.PlaceholderText="Script name for auto-exec"; autoBox.Text=""; autoBox.ClearTextOnFocus=false; autoBox.TextWrapped=true; autoBox.TextXAlignment=Enum.TextXAlignment.Left; autoBox.TextYAlignment=Enum.TextYAlignment.Top; autoBox.BorderSizePixel=0; autoBox.Font=Enum.Font.Gotham; autoBox.TextSize=14; makeCorner(autoBox,8); autoBox.Parent=p
+    makeButton(p,"Add Auto-Exec for this game",function()
+        if autoBox.Text~="" then
+            config.autoExec[tostring(currentGameId)] = autoBox.Text
+            pushLog("Auto-exec set for "..currentGameId)
+        end
+    end)
+    local gameNameLower = string.lower(game.Name or "")
+    local isFisch = game.PlaceId==16732694052 or gameNameLower:find("fisch")
+    local isFishIt = gameNameLower:find("fish it") ~= nil
+    local isForge = gameNameLower:find("forge") ~= nil
+    -- per-game modules with tag filters
+    local function addWorldTagESP(tagList, fill, outline)
+        clearWorldESP()
+        for _,d in ipairs(workspace:GetDescendants()) do
+            if d:IsA("BasePart") then
+                for _,tag in ipairs(tagList) do
+                    if d.Name:lower():find(tag) then
+                        local h=Instance.new("Highlight"); h.FillColor=fill; h.OutlineColor=outline; h.Adornee=d; h.Parent=d; table.insert(worldHighlights,h)
+                        break
+                    end
+                end
+            end
+        end
+    end
+
+    if isFisch or isFishIt then
+        local fishFilter=Instance.new("TextBox"); fishFilter.Size=UDim2.new(1,-10,0,30); fishFilter.BackgroundColor3=colors.bg; fishFilter.TextColor3=colors.text; fishFilter.Text="fish,hotspot"; fishFilter.PlaceholderText="Tags: fish,hotspot"; fishFilter.BorderSizePixel=0; fishFilter.Font=Enum.Font.Gotham; fishFilter.TextSize=14; makeCorner(fishFilter,8); fishFilter.Parent=p
+        makeToggle(p,"Fishing: Auto Interact (reel)",function(on) config.autoInteractFilter="reel"; autoInteractEnabled=on end)
+        makeToggle(p,"Fishing: ESP (fish/hotspots)",function(on)
+            if on then
+                local tags={}
+                for t in string.gmatch(string.lower(fishFilter.Text), "([^,]+)") do table.insert(tags, t:match("^%s*(.-)%s*$")) end
+                addWorldTagESP(tags, Color3.fromRGB(60,200,255), Color3.fromRGB(10,120,200))
+            else
+                clearWorldESP()
+            end
+        end)
+    end
+    if isForge then
+        local forgeFilter=Instance.new("TextBox"); forgeFilter.Size=UDim2.new(1,-10,0,30); forgeFilter.BackgroundColor3=colors.bg; forgeFilter.TextColor3=colors.text; forgeFilter.Text="ore,anvil,forge,smelt"; forgeFilter.PlaceholderText="Tags: ore,anvil,forge"; forgeFilter.BorderSizePixel=0; forgeFilter.Font=Enum.Font.Gotham; forgeFilter.TextSize=14; makeCorner(forgeFilter,8); forgeFilter.Parent=p
+        makeToggle(p,"Forge: Ore/Station ESP",function(on)
+            if on then
+                local tags={}
+                for t in string.gmatch(string.lower(forgeFilter.Text), "([^,]+)") do table.insert(tags, t:match("^%s*(.-)%s*$")) end
+                addWorldTagESP(tags, Color3.fromRGB(200,140,60), Color3.fromRGB(255,200,120))
+            else
+                clearWorldESP()
+            end
+        end)
+        makeToggle(p,"Forge: Auto Interact prompts",function(on) config.autoInteractFilter="forge,smelt,anvil"; autoInteractEnabled=on end)
+    end
 end
 
 -- Configs
 do
     local p=pages["Configs"]
     makeButton(p,"Copy Config to Clipboard",function() if setclipboard then setclipboard(HttpService:JSONEncode(config)); toast("Config copied") else toast("setclipboard not available") end end)
-    makeButton(p,"Create/Save Config (Desktop/ADVHub)",function() saveConfigToFile("Config_"..tostring(os.time())) end)
-    makeButton(p,"Load Config File",function() toast("Use console: loadConfigFromFile('name')") end)
+    makeButton(p,"Create/Save Config (Desktop/ADVHub)",function()
+        local name="Config_"..tostring(os.time())
+        saveConfigToFile(name)
+        config.lastConfig = name
+        pushLog("Saved "..name)
+    end)
+    local configList = listConfigs()
+    local selectedConfig = configList[1]
+    makeDropdown(p,"Load Config",configList,function(v) selectedConfig=v end)
+    makeButton(p,"Load Selected",function()
+        if selectedConfig and selectedConfig ~= "None" then
+            loadConfigFromFile(selectedConfig)
+            config.lastConfig = selectedConfig
+            pushLog("Loaded "..selectedConfig)
+        else
+            toast("No config selected")
+        end
+    end)
+    makeButton(p,"Delete Selected",function()
+        if selectedConfig and selectedConfig ~= "None" and delfile then
+            local path="ADVHub/"..selectedConfig..".json"
+            pcall(function() delfile(path) end)
+            pushLog("Deleted "..selectedConfig)
+        else
+            toast("No config selected or delfile missing")
+        end
+    end)
+    makeButton(p,"Duplicate Selected",function()
+        if selectedConfig and selectedConfig ~= "None" then
+            local src="ADVHub/"..selectedConfig..".json"
+            local dst="ADVHub/"..selectedConfig.."_copy.json"
+            local ok,content=pcall(function() return readfile(src) end)
+            if ok then pcall(function() writefile(dst, content) end); pushLog("Duplicated "..selectedConfig) else toast("Copy failed") end
+        else
+            toast("Select a config first")
+        end
+    end)
     makeDropdown(p,"Theme",{"Christmas","Midnight","NeoGreen","Amber","Purple"},function(v) config.theme=v; applyTheme() end)
-    makeButton(p,"Apply Preset: Legit",function() local t=config.presets.legit; config.wsBoost=t.ws; config.jpBoost=t.jp; camera.FieldOfView=t.fov; config.aimbotEnabled=t.aimbot; config.esp.enabled=t.esp; toast("Legit preset applied") end)
-    makeButton(p,"Apply Preset: Rage",function() local t=config.presets.rage; config.wsBoost=t.ws; config.jpBoost=t.jp; camera.FieldOfView=t.fov; config.aimbotEnabled=t.aimbot; config.esp.enabled=t.esp; toast("Rage preset applied") end)
-    makeButton(p,"Apply Preset: Visuals",function() local t=config.presets.visuals; camera.FieldOfView=t.fov; config.aimbotEnabled=t.aimbot; config.esp.enabled=t.esp; toast("Visuals preset applied") end)
+    makeButton(p,"Apply Preset: Legit",function() local t=config.presets.legit; config.wsBoost=t.ws; config.jpBoost=t.jp; camera.FieldOfView=t.fov; config.aimbotEnabled=t.aimbot; config.esp.enabled=t.esp; config.lastPreset="Legit"; toast("Legit preset applied") end)
+    makeButton(p,"Apply Preset: Rage",function() local t=config.presets.rage; config.wsBoost=t.ws; config.jpBoost=t.jp; camera.FieldOfView=t.fov; config.aimbotEnabled=t.aimbot; config.esp.enabled=t.esp; config.lastPreset="Rage"; toast("Rage preset applied") end)
+    makeButton(p,"Apply Preset: Visuals",function() local t=config.presets.visuals; camera.FieldOfView=t.fov; config.aimbotEnabled=t.aimbot; config.esp.enabled=t.esp; config.lastPreset="Visuals"; toast("Visuals preset applied") end)
     makeButton(p,"Set Auto-Load (Global)",function() saveConfigToFile("AutoLoad_Global") end)
     makeButton(p,"Set Auto-Load (This Game)",function() saveConfigToFile("AutoLoad_"..tostring(currentGameId)) end)
+    makeButton(p,"List Saved Configs (console)",function()
+        if listfiles and isfolder and isfolder("ADVHub") then
+            local files = listfiles("ADVHub")
+            for _,f in ipairs(files) do print("ADVHub file:", f) end
+            pushLog("Listed configs in console")
+        else
+            toast("listfiles not available")
+        end
+    end)
 end
 
 -- Protection
@@ -494,7 +674,33 @@ do
     makeToggle(p,"Auto-disable on teleport",function(on) config.autoDisableOnTP=on end,config.autoDisableOnTP)
     makeToggle(p,"Stop features on panic",function(on) config.stopOnPanic=on end,config.stopOnPanic)
     makeToggle(p,"Low Profile Mode (visual only)",function(on) config.lowProfile=on end,false)
-    makeToggle(p,"Menu Blur",function(on) config.uiBlur=on; setBlur(on) end, config.uiBlur)
+    makeToggle(p,"Menu Blur",function(on) config.uiBlur=on; setBlur(on, config.blurSize) end, config.uiBlur)
+    makeToggle(p,"Snow Overlay",function(on) config.snow=on; if on then
+        if not gui:FindFirstChild("SnowLayer") then
+            local snow=Instance.new("ImageLabel"); snow.Name="SnowLayer"; snow.Parent=gui; snow.Size=UDim2.new(1,0,1,0); snow.Position=UDim2.new(0,0,0,0); snow.BackgroundTransparency=1
+            snow.Image="rbxassetid://6764432401"; snow.ImageTransparency=0.25; snow.ScaleType=Enum.ScaleType.Tile; snow.TileSize=UDim2.new(0,128,0,128)
+            task.spawn(function()
+                while snow.Parent do
+                    tween(snow,2,{Position=UDim2.new(0,-20,0,-20)}):Play()
+                    task.wait(2)
+                    snow.Position=UDim2.new(0,0,0,0)
+                end
+            end)
+        end
+    else
+        local snow=gui:FindFirstChild("SnowLayer"); if snow then snow:Destroy() end
+    end end, config.snow)
+    makeToggle(p,"Solid Theme (no gradient)",function(on)
+        config.solidTheme=on
+        local g=main:FindFirstChildOfClass("UIGradient")
+        if g then g.Enabled=not on end
+    end, config.solidTheme)
+    makeToggle(p,"Disable in VIP/Private",function(on) config.disableInVIP=on end, config.disableInVIP)
+    local box=Instance.new("TextBox"); box.Size=UDim2.new(1,-10,0,36); box.BackgroundColor3=colors.bg; box.TextColor3=colors.text; box.PlaceholderText="Username to whitelist"; box.Text=""; box.BorderSizePixel=0; box.Font=Enum.Font.Gotham; box.TextSize=14; makeCorner(box,8); box.Parent=p
+    makeButton(p,"Add to Whitelist",function()
+        if box.Text and box.Text~="" then table.insert(config.friendWhitelist, box.Text); pushLog("Whitelisted "..box.Text); box.Text="" end
+    end)
+    makeButton(p,"Clear Whitelist",function() config.friendWhitelist={} pushLog("Whitelist cleared") end)
 end
 
 -- UI / Theme
@@ -504,27 +710,59 @@ do
     makeSlider(p,"Menu Opacity",0.5,1,config.uiOpacity,function(v) config.uiOpacity=v; applyOpacity(main) end)
     makeSlider(p,"Menu Width",520,820,mainWidth,function(v) setMainSize(v, mainHeight) end)
     makeSlider(p,"Menu Height",360,640,mainHeight,function(v) setMainSize(mainWidth, v) end)
+    makeSlider(p,"Blur Strength",0,15,config.blurSize,function(v) config.blurSize=v; if config.uiBlur then setBlur(true, v) end end)
+    makeToggle(p,"Compact Layout",function(on) config.compact=on; toast("Reopen UI to apply compact spacing") end, config.compact)
     makeToggle(p,"UI Animations",function(on) config.animations=on end,true)
     makeToggle(p,"UI Sounds",function(on) config.uiSounds=on end,false)
+    makeButton(p,"Apply Fisch/Fish It Visuals",function()
+        config.gamePreset="FischVisual"
+        config.autoInteractFilter="reel"
+        config.esp.nameFilter="fish,hotspot"
+        toast("Applied Fisch/Fish It visual preset")
+    end)
+    makeButton(p,"Apply Forge Visuals",function()
+        config.gamePreset="ForgeVisual"
+        config.autoInteractFilter="forge,smelt,anvil"
+        config.esp.nameFilter="ore,anvil,forge,smelt"
+        toast("Applied Forge visual preset")
+    end)
     makeButton(p,"Changelog",function() toast("v5.2: scrollable UI, ESP colors, status HUD, config save/load, opacity controls") end)
 end
 
 -- Overlay HUD + Quick Bar
-local overlay = Instance.new("Frame"); overlay.Size=UDim2.new(0,220,0,24); overlay.Position=UDim2.new(0,8,0,8); overlay.BackgroundColor3=Color3.fromRGB(0,0,0); overlay.BackgroundTransparency=0.35; overlay.BorderSizePixel=0; overlay.Parent=gui; makeCorner(overlay,8)
-local overlayLabel=Instance.new("TextLabel"); overlayLabel.BackgroundTransparency=1; overlayLabel.Size=UDim2.new(1,-10,1,0); overlayLabel.Position=UDim2.new(0,6,0,0); overlayLabel.Font=Enum.Font.GothamSemibold; overlayLabel.TextColor3=Color3.new(1,1,1); overlayLabel.TextSize=13; overlayLabel.TextXAlignment=Enum.TextXAlignment.Left; overlayLabel.Parent=overlay
-
-local quickBar = Instance.new("Frame"); quickBar.Size=UDim2.new(0,260,0,32); quickBar.Position=UDim2.new(1,-280,1,-48); quickBar.BackgroundColor3=Color3.fromRGB(0,0,0); quickBar.BackgroundTransparency=0.35; quickBar.BorderSizePixel=0; quickBar.Parent=gui; makeCorner(quickBar,10)
-local qList=Instance.new("UIListLayout",quickBar); qList.FillDirection=Enum.FillDirection.Horizontal; qList.Padding=UDim.new(0,6); qList.VerticalAlignment=Enum.VerticalAlignment.Center; qList.HorizontalAlignment=Enum.HorizontalAlignment.Center
-local function qToggle(label,stateRef)
-    local b=Instance.new("TextButton"); b.Size=UDim2.fromOffset(70,24); b.BackgroundColor3=Color3.fromRGB(30,30,30); b.BorderSizePixel=0; b.TextColor3=Color3.new(1,1,1); b.Font=Enum.Font.Gotham; b.TextSize=12; b.Text=label; makeCorner(b,8); b.Parent=quickBar
-    b.MouseButton1Click:Connect(function()
-        if stateRef=="ESP" then config.esp.enabled=not config.esp.enabled; clearESP(); if config.esp.enabled then for _,pl in ipairs(Players:GetPlayers()) do addESP(pl) end end
-        elseif stateRef=="AIM" then config.aimbotEnabled=not config.aimbotEnabled
-        elseif stateRef=="FLY" then flyEnabled=not flyEnabled
-        elseif stateRef=="PANIC" then clearESP(); gui:Destroy(); offscreenGui:Destroy(); setBlur(false); Hum.WalkSpeed=wsDefault; Hum.JumpPower=jpDefault; workspace.Gravity=gravityDefault end
+local function makeDraggable(frame)
+    local dragging=false; local dragStart; local startPos
+    frame.InputBegan:Connect(function(input)
+        if input.UserInputType==Enum.UserInputType.MouseButton1 then
+            dragging=true; dragStart=input.Position; startPos=frame.Position
+            input.Changed:Connect(function() if input.UserInputState==Enum.UserInputState.End then dragging=false end end)
+        end
+    end)
+    frame.InputChanged:Connect(function(input)
+        if dragging and input.UserInputType==Enum.UserInputType.MouseMovement then
+            local delta=input.Position-dragStart
+            frame.Position=UDim2.new(startPos.X.Scale,startPos.X.Offset+delta.X,startPos.Y.Scale,startPos.Y.Offset+delta.Y)
+        end
     end)
 end
-qToggle("ESP","ESP"); qToggle("Aimbot","AIM"); qToggle("Fly","FLY"); qToggle("Panic","PANIC")
+
+local overlay = Instance.new("Frame"); overlay.Size=UDim2.new(0,220,0,24); overlay.Position=UDim2.new(0,8,0,8); overlay.BackgroundColor3=Color3.fromRGB(0,0,0); overlay.BackgroundTransparency=0.35; overlay.BorderSizePixel=0; overlay.Parent=gui; makeCorner(overlay,8); makeDraggable(overlay)
+local overlayLabel=Instance.new("TextLabel"); overlayLabel.BackgroundTransparency=1; overlayLabel.Size=UDim2.new(1,-10,1,0); overlayLabel.Position=UDim2.new(0,6,0,0); overlayLabel.Font=Enum.Font.GothamSemibold; overlayLabel.TextColor3=Color3.new(1,1,1); overlayLabel.TextSize=13; overlayLabel.TextXAlignment=Enum.TextXAlignment.Left; overlayLabel.Parent=overlay
+
+local quickBar = Instance.new("Frame"); quickBar.Size=UDim2.new(0,260,0,32); quickBar.Position=UDim2.new(1,-280,1,-48); quickBar.BackgroundColor3=Color3.fromRGB(0,0,0); quickBar.BackgroundTransparency=0.35; quickBar.BorderSizePixel=0; quickBar.Parent=gui; makeCorner(quickBar,10); makeDraggable(quickBar); quickBar.Visible=config.showQuickbar
+local qList=Instance.new("UIListLayout",quickBar); qList.FillDirection=Enum.FillDirection.Horizontal; qList.Padding=UDim.new(0,6); qList.VerticalAlignment=Enum.VerticalAlignment.Center; qList.HorizontalAlignment=Enum.HorizontalAlignment.Center
+local function qToggle(label,getState,toggleFn)
+    local b=Instance.new("TextButton"); b.Size=UDim2.fromOffset(70,24); b.BackgroundColor3=Color3.fromRGB(30,30,30); b.BorderSizePixel=0; b.TextColor3=Color3.new(1,1,1); b.Font=Enum.Font.Gotham; b.TextSize=12; b.Text=label; makeCorner(b,8); b.Parent=quickBar
+    local function update()
+        b.BackgroundColor3 = getState() and colors.accent or Color3.fromRGB(30,30,30)
+    end
+    b.MouseButton1Click:Connect(function() toggleFn(); update() end)
+    update()
+end
+qToggle("ESP", function() return config.esp.enabled end, function() config.esp.enabled=not config.esp.enabled; clearESP(); if config.esp.enabled then for _,pl in ipairs(Players:GetPlayers()) do addESP(pl) end end end)
+qToggle("Aimbot", function() return config.aimbotEnabled end, function() config.aimbotEnabled=not config.aimbotEnabled end)
+qToggle("Fly", function() return flyEnabled end, function() flyEnabled=not flyEnabled end)
+qToggle("Panic", function() return false end, function() clearESP(); gui:Destroy(); offscreenGui:Destroy(); setBlur(false); Hum.WalkSpeed=wsDefault; Hum.JumpPower=jpDefault; workspace.Gravity=gravityDefault end)
 
 -- Keybinds & panic
 UserInputService.InputBegan:Connect(function(input,gp)
@@ -542,7 +780,28 @@ UserInputService.InputBegan:Connect(function(input,gp)
     elseif input.KeyCode == config.keybinds.toggleESP then config.esp.enabled=not config.esp.enabled; clearESP(); if config.esp.enabled then for _,pl in ipairs(Players:GetPlayers()) do addESP(pl) end end
     elseif input.KeyCode == config.keybinds.toggleFly then flyEnabled=not flyEnabled
     elseif input.KeyCode == config.keybinds.toggleNoclip then noclipEnabled=not noclipEnabled
+    elseif input.KeyCode == config.overlayToggleKey then
+        overlay.Visible = not overlay.Visible
+        quickBar.Visible = not quickBar.Visible
     elseif input.KeyCode == Enum.KeyCode.Space and infiniteJump then Hum:ChangeState(Enum.HumanoidStateType.Jumping) end
+end)
+
+local function autoDisable(reason)
+    config.aimbotEnabled=false
+    config.esp.enabled=false
+    flyEnabled=false
+    noclipEnabled=false
+    autoClickEnabled=false
+    autoInteractEnabled=false
+    clearESP()
+    Hum.WalkSpeed=wsDefault; Hum.JumpPower=jpDefault; workspace.Gravity=gravityDefault
+    pushLog("Disabled ("..reason..")")
+end
+Hum.Died:Connect(function()
+    if config.autoDisableOnTP then autoDisable("death") end
+end)
+TeleportService.TeleportInitFailed:Connect(function()
+    if config.autoDisableOnTP then autoDisable("teleport") end
 end)
 
 -- Loops
@@ -568,18 +827,31 @@ table.insert(connections, RunService.RenderStepped:Connect(function()
 end))
 
 table.insert(connections, RunService.RenderStepped:Connect(function()
-    if config.aimbotEnabled and UserInputService:IsMouseButtonPressed(config.aimbotKey) then
-        local target=getClosestTarget()
-        if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
-            pulseFov()
-            local targetPos = target.Character.HumanoidRootPart.Position
-            if config.aimbotArea=="Head" then local h=target.Character:FindFirstChild("Head"); if h then targetPos=h.Position end
-            elseif config.aimbotArea=="Torso" then local t=target.Character:FindFirstChild("UpperTorso") or target.Character:FindFirstChild("HumanoidRootPart"); if t then targetPos=t.Position end
-            elseif config.aimbotArea=="Random" then local parts={"Head","UpperTorso","HumanoidRootPart","LeftUpperArm","RightUpperArm"}; local choice=target.Character:FindFirstChild(parts[math.random(1,#parts)]); if choice then targetPos=choice.Position end end
+    local target = nil
+    if config.stickTarget and _G.__stickyTarget and _G.__stickyTarget.Parent then
+        target = _G.__stickyTarget
+    else
+        target = getClosestTarget()
+    end
+    if config.aimbotEnabled and target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") and UserInputService:IsMouseButtonPressed(config.aimbotKey) then
+        pulseFov()
+        local targetPos = target.Character.HumanoidRootPart.Position
+        if config.aimbotArea=="Head" then local h=target.Character:FindFirstChild("Head"); if h then targetPos=h.Position end
+        elseif config.aimbotArea=="Torso" then local t=target.Character:FindFirstChild("UpperTorso") or target.Character:FindFirstChild("HumanoidRootPart"); if t then targetPos=t.Position end
+        elseif config.aimbotArea=="Random" then local parts={"Head","UpperTorso","HumanoidRootPart","LeftUpperArm","RightUpperArm"}; local choice=target.Character:FindFirstChild(parts[math.random(1,#parts)]); if choice then targetPos=choice.Position end end
+        if config.silentAim then
+            local screenPos = camera:WorldToViewportPoint(targetPos)
+            VirtualInputManager:SendMouseButtonEvent(screenPos.X, screenPos.Y, 0, true, nil, 0)
+            VirtualInputManager:SendMouseButtonEvent(screenPos.X, screenPos.Y, 0, false, nil, 0)
+        else
             local look=CFrame.new(camera.CFrame.Position,targetPos)
             camera.CFrame=camera.CFrame:Lerp(look,config.aimbotSmooth)
             if config.triggerEnabled then VirtualInputManager:SendMouseButtonEvent(0,0,0,true,nil,0); VirtualInputManager:SendMouseButtonEvent(0,0,0,false,nil,0) end
         end
+        _G.__lastTargetName = target.Name
+        _G.__lastTargetDist = (targetPos - HRP.Position).Magnitude
+        if config.aimbotLegitDecay then config.aimbotFov = math.max(40, config.aimbotFov - 0.2) end
+        if config.stickTarget then _G.__stickyTarget = target end
     end
 end))
 
@@ -594,7 +866,18 @@ task.spawn(function()
     while true do
         if autoInteractEnabled then
             for _,prompt in ipairs(workspace:GetDescendants()) do
-                if prompt:IsA("ProximityPrompt") and prompt.Enabled then pcall(function() fireproximityprompt(prompt) end) end
+                if prompt:IsA("ProximityPrompt") and prompt.Enabled then
+                    local allow = true
+                    if config.autoInteractFilter and config.autoInteractFilter ~= "" then
+                        allow=false
+                        local text = string.lower(prompt.Name or "")
+                        for tag in string.gmatch(string.lower(config.autoInteractFilter), "([^,]+)") do
+                            tag = tag:match("^%s*(.-)%s*$")
+                            if tag ~= "" and text:find(tag) then allow=true end
+                        end
+                    end
+                    if allow then pcall(function() fireproximityprompt(prompt) end) end
+                end
             end
         end
         task.wait(0.5)
@@ -609,11 +892,17 @@ task.spawn(function()
 end)
 
 local last=tick()
+local sessionStart = tick()
 table.insert(connections, RunService.RenderStepped:Connect(function()
     local now=tick(); local fps=1/math.max(now-last, 1/60); last=now
     local ping=math.floor(Stats.Network.ServerStatsItem["Data Ping"]:GetValue() or 0)
-    statusLabel.Text = string.format("FPS: %d | Ping: %dms", math.floor(fps), ping)
-    overlayLabel.Text = string.format("FPS: %d | Ping: %dms | Mode: %s", math.floor(fps), ping, config.aimbotEnabled and "Aimbot" or "Idle")
+    local session = math.floor(now - sessionStart)
+    statusLabel.Text = string.format("FPS: %d | Ping: %dms | %ds | LastCfg: %s", math.floor(fps), ping, session, config.lastConfig ~= "" and config.lastConfig or "none")
+    local targetText = ""
+    if _G.__lastTargetName and _G.__lastTargetDist then
+        targetText = string.format(" | Target: %s (%dm)", _G.__lastTargetName, math.floor(_G.__lastTargetDist))
+    end
+    overlayLabel.Text = string.format("FPS: %d | Ping: %dms | Mode: %s%s", math.floor(fps), ping, config.aimbotEnabled and "Aimbot" or "Idle", targetText)
 end))
 
 -- Float anim
@@ -637,4 +926,7 @@ applyTheme()
 setBlur(config.uiBlur)
 applyOpacity(main)
 autoLoadConfig()
+if config.disableInVIP and (game.PrivateServerId and game.PrivateServerId ~= "") then
+    autoDisable("VIP/Private")
+end
 toast("Loaded Advanced Universal Hub v"..config.version)
