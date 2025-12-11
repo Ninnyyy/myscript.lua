@@ -331,10 +331,14 @@ local function setMainSize(w,h)
     main.Position = UDim2.new(0.5,-w/2,0.5,-h/2)
 end
 local grad=Instance.new("UIGradient",main); grad.Color=ColorSequence.new{ColorSequenceKeypoint.new(0,colors.bg),ColorSequenceKeypoint.new(1,colors.accent2)}; grad.Rotation=60
+local grip = Instance.new("Frame"); grip.Size=UDim2.fromOffset(14,14); grip.Position=UDim2.new(1,-18,1,-18); grip.BackgroundColor3=colors.panel; grip.BorderSizePixel=0; makeCorner(grip,4); grip.Parent=main
+makeDraggable(grip, function(delta)
+    setMainSize(math.clamp(mainWidth + delta.X, 520, 900), math.clamp(mainHeight + delta.Y, 360, 720))
+end)
 
 -- Title
 local title=Instance.new("Frame"); title.Size=UDim2.new(1,0,0,46); title.BackgroundColor3=colors.panel; title.BorderSizePixel=0; title.Parent=main; makeCorner(title,12)
-local titleLabel=Instance.new("TextLabel"); titleLabel.Size=UDim2.new(1,-170,1,0); titleLabel.Position=UDim2.new(0,16,0,0); titleLabel.BackgroundTransparency=1; titleLabel.Font=Enum.Font.GothamBold; titleLabel.Text="Ninnydll"; titleLabel.TextColor3=Color3.fromRGB(255,215,120); titleLabel.TextSize=18; titleLabel.TextXAlignment=Enum.TextXAlignment.Left; titleLabel.Parent=title
+local titleLabel=Instance.new("TextLabel"); titleLabel.Size=UDim2.new(1,-170,1,0); titleLabel.Position=UDim2.new(0,18,0,6); titleLabel.BackgroundTransparency=1; titleLabel.Font=Enum.Font.GothamBold; titleLabel.Text="Ninnydll"; titleLabel.TextColor3=Color3.fromRGB(255,215,120); titleLabel.TextSize=18; titleLabel.TextXAlignment=Enum.TextXAlignment.Left; titleLabel.Parent=title
 task.spawn(function()
     local gold1 = Color3.fromRGB(255,215,120)
     local gold2 = Color3.fromRGB(255,235,170)
@@ -345,8 +349,8 @@ task.spawn(function()
         task.wait(0.8)
     end
 end)
-local versionLabel=Instance.new("TextLabel"); versionLabel.Size=UDim2.new(0,70,1,0); versionLabel.Position=UDim2.new(1,-80,0,0); versionLabel.BackgroundTransparency=1; versionLabel.Font=Enum.Font.Gotham; versionLabel.Text="v"..config.version; versionLabel.TextColor3=colors.subtle; versionLabel.TextSize=13; versionLabel.TextXAlignment=Enum.TextXAlignment.Right; versionLabel.Parent=title
-local logLabel=Instance.new("TextLabel"); logLabel.Size=UDim2.new(0,180,1,0); logLabel.Position=UDim2.new(1,-260,0,0); logLabel.BackgroundTransparency=1; logLabel.Font=Enum.Font.GothamSemibold; logLabel.Text="Logs ready"; logLabel.TextColor3=colors.warn; logLabel.TextSize=13; logLabel.TextXAlignment=Enum.TextXAlignment.Right; logLabel.Parent=title
+local versionLabel=Instance.new("TextLabel"); versionLabel.Size=UDim2.new(0,70,1,0); versionLabel.Position=UDim2.new(1,-88,0,6); versionLabel.BackgroundTransparency=1; versionLabel.Font=Enum.Font.Gotham; versionLabel.Text="v"..config.version; versionLabel.TextColor3=colors.subtle; versionLabel.TextSize=13; versionLabel.TextXAlignment=Enum.TextXAlignment.Right; versionLabel.Parent=title
+local logLabel=Instance.new("TextLabel"); logLabel.Size=UDim2.new(0,180,1,0); logLabel.Position=UDim2.new(1,-270,0,6); logLabel.BackgroundTransparency=1; logLabel.Font=Enum.Font.GothamSemibold; logLabel.Text="Logs ready"; logLabel.TextColor3=colors.warn; logLabel.TextSize=13; logLabel.TextXAlignment=Enum.TextXAlignment.Right; logLabel.Parent=title
 local function pushLog(msg)
     if logLabel then logLabel.Text = msg end
 end
@@ -355,24 +359,26 @@ end
 local statusLabel=Instance.new("TextLabel"); statusLabel.BackgroundTransparency=1; statusLabel.Size=UDim2.new(0, 220, 0, 20); statusLabel.Position=UDim2.new(1,-230,0,48); statusLabel.Font=Enum.Font.Gotham; statusLabel.TextColor3=colors.subtle; statusLabel.TextSize=13; statusLabel.TextXAlignment=Enum.TextXAlignment.Right; statusLabel.Parent=main
 
 -- Quick pills
-local quick=Instance.new("Frame"); quick.Size=UDim2.new(0,640,0,32); quick.Position=UDim2.new(0,0,0,-36); quick.BackgroundTransparency=1; quick.Parent=main
-local qaList=Instance.new("UIListLayout",quick); qaList.Padding=UDim.new(0,8); qaList.FillDirection=Enum.FillDirection.Horizontal; qaList.HorizontalAlignment=Enum.HorizontalAlignment.Right; qaList.VerticalAlignment=Enum.VerticalAlignment.Center
+local quick=Instance.new("Frame"); quick.Size=UDim2.new(0, mainWidth, 0, 32); quick.Position=UDim2.new(0,0,0,-40); quick.BackgroundTransparency=1; quick.Parent=main
+local qaList=Instance.new("UIListLayout",quick); qaList.Padding=UDim.new(0,8); qaList.FillDirection=Enum.FillDirection.Horizontal; qaList.HorizontalAlignment=Enum.HorizontalAlignment.Center; qaList.VerticalAlignment=Enum.VerticalAlignment.Center
+local quickPad=Instance.new("UIPadding", quick); quickPad.PaddingLeft=UDim.new(0,12); quickPad.PaddingRight=UDim.new(0,12)
 local function pill(label,color,cb) local b=Instance.new("TextButton"); b.Size=UDim2.fromOffset(120,28); b.BackgroundColor3=color; b.BorderSizePixel=0; b.TextColor3=Color3.new(1,1,1); b.TextSize=13; b.Font=Enum.Font.GothamSemibold; b.Text=label; b.AutoButtonColor=false; makeCorner(b,14); b.Parent=quick; b.MouseButton1Click:Connect(function() ripple(b); if cb then cb() end end) end
 pill("Panic",colors.danger,function() clearESP(); gui:Destroy(); offscreenGui:Destroy(); setBlur(false); Hum.WalkSpeed=wsDefault; Hum.JumpPower=jpDefault; workspace.Gravity=gravityDefault end)
 pill("Hide UI",colors.accent2,function() hidden=not hidden; main.Visible=not hidden; offscreenGui.Enabled=not hidden end)
 pill("Rejoin",colors.accent,function() TeleportService:Teleport(game.PlaceId,LP) end)
 
 -- Tabs & pages
-local tabs=Instance.new("Frame"); tabs.Size=UDim2.new(0,170,1,-46); tabs.Position=UDim2.new(0,0,0,46); tabs.BackgroundColor3=colors.panel; tabs.BorderSizePixel=0; tabs.Parent=main; makeCorner(tabs,12)
-local tabList=Instance.new("UIListLayout",tabs); tabList.VerticalAlignment=Enum.VerticalAlignment.Top; tabList.HorizontalAlignment=Enum.HorizontalAlignment.Center; tabList.Padding=UDim.new(0,8)
+local tabs=Instance.new("Frame"); tabs.Size=UDim2.new(0,175,1,-52); tabs.Position=UDim2.new(0,0,0,52); tabs.BackgroundColor3=colors.panel; tabs.BorderSizePixel=0; tabs.Parent=main; makeCorner(tabs,12)
+local tabsPad = Instance.new("UIPadding", tabs); tabsPad.PaddingLeft = UDim.new(0,8); tabsPad.PaddingRight = UDim.new(0,8); tabsPad.PaddingTop = UDim.new(0,10)
+local tabList=Instance.new("UIListLayout",tabs); tabList.VerticalAlignment=Enum.VerticalAlignment.Top; tabList.HorizontalAlignment=Enum.HorizontalAlignment.Center; tabList.Padding=UDim.new(0, config.compact and 6 or 8)
 local tabNames={"Dashboard","Movement","Visuals","Combat","Automation","Player List","Script Hub","Configs","Protection","UI / Theme"}
 local pages={}
 local selectedTab
-local pageHolder=Instance.new("Frame"); pageHolder.Size=UDim2.new(1,-170,1,-46); pageHolder.Position=UDim2.new(0,170,0,46); pageHolder.BackgroundTransparency=1; pageHolder.Parent=main
+local pageHolder=Instance.new("Frame"); pageHolder.Size=UDim2.new(1,-185,1,-62); pageHolder.Position=UDim2.new(0,185,0,52); pageHolder.BackgroundTransparency=1; pageHolder.Parent=main
 for _,name in ipairs(tabNames) do
-    local page=Instance.new("ScrollingFrame"); page.Size=UDim2.new(1,-24,1,-24); page.Position=UDim2.new(0,12,0,12); page.BackgroundTransparency=1; page.Visible=false; page.ScrollBarThickness=4; page.CanvasSize=UDim2.new(0,0,0,0); page.Parent=pageHolder
-    local list=Instance.new("UIListLayout",page); list.Padding=UDim.new(0,10); list.FillDirection=Enum.FillDirection.Vertical; list.HorizontalAlignment=Enum.HorizontalAlignment.Left; list.VerticalAlignment=Enum.VerticalAlignment.Top
-    local pad=Instance.new("UIPadding",page); pad.PaddingLeft=UDim.new(0,0); pad.PaddingTop=UDim.new(0,0)
+    local page=Instance.new("ScrollingFrame"); page.Size=UDim2.new(1,-24,1,-24); page.Position=UDim2.new(0,12,0,12); page.BackgroundTransparency=1; page.Visible=false; page.ScrollBarThickness=6; page.VerticalScrollBarInset=Enum.ScrollBarInset.ScrollBar; page.CanvasSize=UDim2.new(0,0,0,0); page.Parent=pageHolder
+    local pad=Instance.new("UIPadding",page); pad.PaddingLeft=UDim.new(0,10); pad.PaddingRight=UDim.new(0,10); pad.PaddingTop=UDim.new(0,10); pad.PaddingBottom=UDim.new(0,10)
+    local list=Instance.new("UIListLayout",page); list.Padding=UDim.new(0, config.compact and 6 or 10); list.FillDirection=Enum.FillDirection.Vertical; list.HorizontalAlignment=Enum.HorizontalAlignment.Left; list.VerticalAlignment=Enum.VerticalAlignment.Top
     list:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function() page.CanvasSize=UDim2.new(0,0,0,list.AbsoluteContentSize.Y+20) end)
     pages[name]=page
 end
@@ -730,7 +736,7 @@ do
 end
 
 -- Overlay HUD + Quick Bar
-local function makeDraggable(frame)
+local function makeDraggable(frame, onDrag)
     local dragging=false; local dragStart; local startPos
     frame.InputBegan:Connect(function(input)
         if input.UserInputType==Enum.UserInputType.MouseButton1 then
@@ -741,7 +747,11 @@ local function makeDraggable(frame)
     frame.InputChanged:Connect(function(input)
         if dragging and input.UserInputType==Enum.UserInputType.MouseMovement then
             local delta=input.Position-dragStart
-            frame.Position=UDim2.new(startPos.X.Scale,startPos.X.Offset+delta.X,startPos.Y.Scale,startPos.Y.Offset+delta.Y)
+            if onDrag then
+                onDrag(delta)
+            else
+                frame.Position=UDim2.new(startPos.X.Scale,startPos.X.Offset+delta.X,startPos.Y.Scale,startPos.Y.Offset+delta.Y)
+            end
         end
     end)
 end
