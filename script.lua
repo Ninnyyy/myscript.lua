@@ -81,6 +81,7 @@ local config = {
     menuW = 640,
     menuH = 480,
     compact = false,
+    animations = true,
     lastConfig = "",
     disableInVIP = false,
     aimbotSkipFriends = true,
@@ -99,6 +100,11 @@ local config = {
     defaultFov = 70,
     autoInteractFilter = "",
     gamePreset = "",
+    worldScanInterval = 3,
+    overlayDock = "TL",
+    recentConfigs = {},
+    fisch = {autoCastDelay=0.6, autoReelDelay=0.4, rarityFilter="Common,Uncommon,Rare", autoSellThreshold=0},
+    forge = {autoInsert=true, autoCollect=true, anvilTolerance=0.18},
 }
 local hidden = false
 
@@ -114,6 +120,7 @@ local flyEnabled, flyBV = false, nil
 local noclipEnabled = false
 local autoClickEnabled = false
 local autoInteractEnabled = false
+local worldEspState = {tags=nil,fill=nil,outline=nil}
 local sprinting = false
 local infiniteJump = false
 local safeWalkEnabled = false
@@ -167,6 +174,29 @@ local function setBlur(on, size)
     end
 end
 local function applyTheme() colors = themes[config.theme] or colors end
+local function parseColor(text)
+    local r,g,b = string.match(text or "", "(%d+)%s*,%s*(%d+)%s*,%s*(%d+)")
+    if r and g and b then
+        return Color3.fromRGB(tonumber(r), tonumber(g), tonumber(b))
+    end
+end
+local function softPanic()
+    config.aimbotEnabled=false
+    config.esp.enabled=false
+    flyEnabled=false
+    noclipEnabled=false
+    autoClickEnabled=false
+    autoInteractEnabled=false
+    clearESP(); clearWorldESP()
+    Hum.WalkSpeed=wsDefault; Hum.JumpPower=jpDefault; workspace.Gravity=gravityDefault
+    pushLog("Soft panic: disabled toggles")
+    toast("Soft panic: toggles disabled")
+end
+local function formatColor(c)
+    if not c then return "" end
+    local r,g,b = math.floor(c.R*255), math.floor(c.G*255), math.floor(c.B*255)
+    return string.format("%d, %d, %d", r,g,b)
+end
 local function applyOpacity(guiObj)
     for _,obj in ipairs(guiObj:GetDescendants()) do
         if obj:IsA("Frame") or obj:IsA("TextButton") or obj:IsA("TextLabel") then
@@ -188,11 +218,13 @@ local function saveConfigToFile(name)
     local path="ADVHub/"..name..".json"
     local ok,err=pcall(function() writefile(path, HttpService:JSONEncode(config)) end)
     toast(ok and ("Saved "..path) or ("Save failed: "..tostring(err)))
+    table.insert(config.recentConfigs,1,name)
+    while #config.recentConfigs>3 do table.remove(config.recentConfigs) end
 end
 local function loadConfigFromFile(name)
     local path="ADVHub/"..name..".json"
     local ok,content=pcall(function() return readfile(path) end)
-    if ok then loadConfigFromString(content); toast("Loaded "..path) else toast("Load failed") end
+    if ok then loadConfigFromString(content); toast("Loaded "..path); table.insert(config.recentConfigs,1,name); while #config.recentConfigs>3 do table.remove(config.recentConfigs) end else toast("Load failed") end
 end
 local function autoLoadConfig()
     ensureDir()
@@ -356,7 +388,7 @@ makeDraggable(grip, function(delta)
 end)
 
 -- Title
-local title=Instance.new("Frame"); title.Size=UDim2.new(1,0,0,46); title.BackgroundColor3=colors.panel; title.BorderSizePixel=0; title.Parent=main; makeCorner(title,12)
+local title=Instance.new("Frame"); title.Size=UDim2.new(1,0,0,46); title.BackgroundColor3=colors.panel:lerp(Color3.new(0,0,0),0.12); title.BorderSizePixel=0; title.Parent=main; makeCorner(title,12)
 local titleLabel=Instance.new("TextLabel"); titleLabel.Size=UDim2.new(1,-170,1,0); titleLabel.Position=UDim2.new(0,18,0,6); titleLabel.BackgroundTransparency=1; titleLabel.Font=Enum.Font.GothamBold; titleLabel.Text="Ninnydll"; titleLabel.TextColor3=Color3.fromRGB(255,215,120); titleLabel.TextSize=18; titleLabel.TextXAlignment=Enum.TextXAlignment.Left; titleLabel.Parent=title
 task.spawn(function()
     local gold1 = Color3.fromRGB(255,215,120)
@@ -373,9 +405,10 @@ local logLabel=Instance.new("TextLabel"); logLabel.Size=UDim2.new(0,180,1,0); lo
 local function pushLog(msg)
     if logLabel then logLabel.Text = msg end
 end
+local underline=Instance.new("Frame"); underline.Size=UDim2.new(1,-16,0,1); underline.Position=UDim2.new(0,8,1,-1); underline.BackgroundColor3=colors.accent; underline.BorderSizePixel=0; underline.Parent=title
 
 -- Status bar
-local statusLabel=Instance.new("TextLabel"); statusLabel.BackgroundTransparency=1; statusLabel.Size=UDim2.new(0, 220, 0, 20); statusLabel.Position=UDim2.new(1,-230,0,48); statusLabel.Font=Enum.Font.Gotham; statusLabel.TextColor3=colors.subtle; statusLabel.TextSize=13; statusLabel.TextXAlignment=Enum.TextXAlignment.Right; statusLabel.Parent=main
+local statusLabel=Instance.new("TextLabel"); statusLabel.BackgroundTransparency=1; statusLabel.Size=UDim2.new(1,-20,0,20); statusLabel.Position=UDim2.new(0,10,0,46); statusLabel.Font=Enum.Font.Gotham; statusLabel.TextColor3=colors.subtle; statusLabel.TextSize=13; statusLabel.TextXAlignment=Enum.TextXAlignment.Left; statusLabel.Parent=main
 
 -- Quick pills
 local quick=Instance.new("Frame"); quick.Size=UDim2.new(0, mainWidth, 0, 32); quick.Position=UDim2.new(0,0,0,-40); quick.BackgroundTransparency=1; quick.Parent=main
@@ -385,12 +418,16 @@ local function pill(label,color,cb) local b=Instance.new("TextButton"); b.Size=U
 pill("Panic",colors.danger,function() clearESP(); gui:Destroy(); offscreenGui:Destroy(); setBlur(false); Hum.WalkSpeed=wsDefault; Hum.JumpPower=jpDefault; workspace.Gravity=gravityDefault end)
 pill("Hide UI",colors.accent2,function() hidden=not hidden; main.Visible=not hidden; offscreenGui.Enabled=not hidden end)
 pill("Rejoin",colors.accent,function() TeleportService:Teleport(game.PlaceId,LP) end)
+pill("Soft Panic",colors.warn,softPanic)
 
 -- Tabs & pages
 local tabs=Instance.new("Frame"); tabs.Size=UDim2.new(0,175,1,-52); tabs.Position=UDim2.new(0,0,0,52); tabs.BackgroundColor3=colors.panel; tabs.BorderSizePixel=0; tabs.Parent=main; makeCorner(tabs,12)
 local tabsPad = Instance.new("UIPadding", tabs); tabsPad.PaddingLeft = UDim.new(0,8); tabsPad.PaddingRight = UDim.new(0,8); tabsPad.PaddingTop = UDim.new(0,10)
 local tabList=Instance.new("UIListLayout",tabs); tabList.VerticalAlignment=Enum.VerticalAlignment.Top; tabList.HorizontalAlignment=Enum.HorizontalAlignment.Center; tabList.Padding=UDim.new(0, config.compact and 6 or 8)
 local tabNames={"Dashboard","Movement","Visuals","Combat","Automation","Player List","Script Hub","Configs","Protection","UI / Theme"}
+local tabIcons={
+    Dashboard="🏠", Movement="🏃", Visuals="👁", Combat="🎯", Automation="⚙️", ["Player List"]="🧑", ["Script Hub"]="📜", Configs="💾", Protection="🛡", ["UI / Theme"]="🎨"
+}
 local pages={}
 local selectedTab
 local pageHolder=Instance.new("Frame"); pageHolder.Size=UDim2.new(1,-185,1,-62); pageHolder.Position=UDim2.new(0,185,0,52); pageHolder.BackgroundTransparency=1; pageHolder.Parent=main
@@ -420,7 +457,7 @@ local function switchTab(name)
     selectedTab=name
 end
 local function createTabButton(name)
-    local b=Instance.new("TextButton"); b.Size=UDim2.new(1,-24,0,38); b.BackgroundColor3=colors.bg; b.BorderSizePixel=0; b.AutoButtonColor=false; b.Font=Enum.Font.GothamSemibold; b.TextColor3=colors.text; b.TextSize=15; b.Text="   "..name; b:SetAttribute("BG",true); makeCorner(b,10); b.Parent=tabs
+    local b=Instance.new("TextButton"); b.Size=UDim2.new(1,-24,0,38); b.BackgroundColor3=colors.bg; b.BorderSizePixel=0; b.AutoButtonColor=false; b.Font=Enum.Font.GothamSemibold; b.TextColor3=colors.text; b.TextSize=15; b.Text=((tabIcons[name] or "").."  "..name); b:SetAttribute("BG",true); makeCorner(b,10); b.Parent=tabs
     b.MouseEnter:Connect(function() tween(b,0.12,{BackgroundColor3=colors.panel}) end)
     b.MouseLeave:Connect(function() if selectedTab~=name then tween(b,0.12,{BackgroundColor3=colors.bg}) end end)
     b.MouseButton1Click:Connect(function()
@@ -430,7 +467,12 @@ local function createTabButton(name)
     end)
     return b
 end
-for _,n in ipairs(tabNames) do tabButtons[n]=createTabButton(n) end
+for i,n in ipairs(tabNames) do
+    tabButtons[n]=createTabButton(n)
+    if n=="Visuals" or n=="Automation" or n=="Configs" then
+        local sep=Instance.new("Frame"); sep.Size=UDim2.new(1,-24,0,1); sep.BackgroundColor3=colors.subtle; sep.BackgroundTransparency=0.8; sep.BorderSizePixel=0; sep.Parent=tabs
+    end
+end
 switchTab("Dashboard"); tween(tabButtons["Dashboard"],0.01,{BackgroundColor3=colors.accent}); tabIndicator.Position=UDim2.new(0,4,0,tabButtons["Dashboard"].Position.Y.Offset); tabIndicator.Visible=true
 
 -- Dashboard
@@ -440,6 +482,14 @@ do
     info.Text=("Game: %s | PlaceId: %s"):format(game.Name or "Unknown", tostring(currentGameId)); info.Parent=p
     local status=Instance.new("TextLabel"); status.BackgroundTransparency=1; status.Size=UDim2.new(1,-10,0,20); status.Font=Enum.Font.Gotham; status.TextColor3=colors.subtle; status.TextSize=14; status.TextXAlignment=Enum.TextXAlignment.Left
     status.Text="Mode: Universal (no per-game module)"; status.Parent=p
+    local sessionInfo=Instance.new("TextLabel"); sessionInfo.BackgroundTransparency=1; sessionInfo.Size=UDim2.new(1,-10,0,20); sessionInfo.Font=Enum.Font.Gotham; sessionInfo.TextColor3=colors.subtle; sessionInfo.TextSize=13; sessionInfo.TextXAlignment=Enum.TextXAlignment.Left; sessionInfo.TextWrapped=true; sessionInfo.Parent=p
+    task.spawn(function()
+        while sessionInfo.Parent do
+            local elapsed = math.floor(tick()-sessionStart)
+            sessionInfo.Text = string.format("Session: %ds | Last preset: %s | Last config: %s", elapsed, config.lastPreset ~= "" and config.lastPreset or "none", config.lastConfig ~= "" and config.lastConfig or "none")
+            task.wait(1)
+        end
+    end)
     makeButton(p,"Universal Features",function() switchTab("Movement"); ripple(tabButtons["Movement"]) end)
     makeButton(p,"Game-Specific Features",function() switchTab("Script Hub"); ripple(tabButtons["Script Hub"]) end)
     makeButton(p,"Configs",function() switchTab("Configs"); ripple(tabButtons["Configs"]) end)
@@ -483,11 +533,34 @@ do
     makeToggle(p,"ESP Healthbar",function(on) config.esp.healthbar=on end,config.esp.healthbar)
     makeToggle(p,"ESP Team Colors",function(on) config.esp.teamColors=on; clearESP(); if config.esp.enabled then for _,pl in ipairs(Players:GetPlayers()) do addESP(pl) end end end,config.esp.teamColors)
     makeDropdown(p,"ESP Color Preset",{"Blue","Red","Green","Purple","Gold"},applyEspPreset)
+    local colorBox=Instance.new("Frame"); colorBox.Size=UDim2.new(1,-10,0,70); colorBox.BackgroundColor3=colors.panel; colorBox.BorderSizePixel=0; makeCorner(colorBox,10); colorBox.Parent=p
+    local grid=Instance.new("UIGridLayout",colorBox); grid.CellSize=UDim2.new(0.24,0,0,30); grid.CellPadding=UDim2.new(0,6,0,6); grid.FillDirection=Enum.FillDirection.Horizontal
+    local function colorInput(label, key)
+        local tb=Instance.new("TextBox"); tb.BackgroundColor3=colors.bg; tb.BorderSizePixel=0; tb.TextColor3=colors.text; tb.Font=Enum.Font.Gotham; tb.TextSize=13; tb.PlaceholderText=label.." (R,G,B)"; tb.Text=formatColor(config.esp.colors[key]); makeCorner(tb,8); tb.Parent=colorBox; return tb
+    end
+    local accentBox=colorInput("Accent","accent")
+    local outlineBox=colorInput("Outline","outline")
+    local boxBox=colorInput("Box","box")
+    local tracerBox=colorInput("Tracer","tracer")
+    makeButton(p,"Apply ESP Colors",function()
+        local acc, out, bx, tr = parseColor(accentBox.Text), parseColor(outlineBox.Text), parseColor(boxBox.Text), parseColor(tracerBox.Text)
+        if acc and out and bx and tr then
+            config.esp.colors = {accent=acc, outline=out, box=bx, tracer=tr, preset="Custom"}
+            clearESP(); if config.esp.enabled then for _,pl in ipairs(Players:GetPlayers()) do addESP(pl) end end
+            toast("Applied custom ESP colors")
+        else
+            toast("Invalid color values")
+        end
+    end)
     makeSlider(p,"Box Thickness",1,6,config.esp.thicknessBox or 2,function(v) config.esp.thicknessBox=v; clearESP(); if config.esp.enabled then for _,pl in ipairs(Players:GetPlayers()) do addESP(pl) end end end)
     makeSlider(p,"Tracer Thickness",1,6,config.esp.thicknessTracer or 2,function(v) config.esp.thicknessTracer=v; clearESP(); if config.esp.enabled then for _,pl in ipairs(Players:GetPlayers()) do addESP(pl) end end end)
     makeSlider(p,"ESP Opacity",0.2,1,config.esp.opacity or 0.6,function(v) config.esp.opacity=v; clearESP(); if config.esp.enabled then for _,pl in ipairs(Players:GetPlayers()) do addESP(pl) end end end)
     local filterBox=Instance.new("TextBox"); filterBox.Size=UDim2.new(1,-10,0,36); filterBox.BackgroundColor3=colors.bg; filterBox.TextColor3=colors.text; filterBox.PlaceholderText="World ESP name filter (comma separated)"; filterBox.Text=config.esp.nameFilter or ""; filterBox.BorderSizePixel=0; filterBox.Font=Enum.Font.Gotham; filterBox.TextSize=14; makeCorner(filterBox,8); filterBox.Parent=p
     filterBox.FocusLost:Connect(function() config.esp.nameFilter=filterBox.Text end)
+    makeButton(p,"Rescan world tags",function()
+        if worldEspState.tags then addWorldTagESP(worldEspState.tags, worldEspState.fill, worldEspState.outline); toast("World tags rescanned") else toast("No world tags active") end
+    end)
+    makeSlider(p,"World ESP rescan (s)",0,10,config.worldScanInterval or 0,function(v) config.worldScanInterval=v end)
     makeSlider(p,"Camera FOV",40,120,config.fov,function(v) config.fov=v; camera.FieldOfView=v end)
     makeToggle(p,"Fullbright",function(on) config.fullbright=on; if on then Lighting.Brightness=2; Lighting.Ambient=Color3.new(1,1,1); Lighting.OutdoorAmbient=Color3.new(1,1,1) else Lighting.Brightness=1; Lighting.Ambient=Color3.new(0,0,0); Lighting.OutdoorAmbient=Color3.new(0,0,0) end end,false)
     makeToggle(p,"No Fog",function(on) config.noFog=on; if on then Lighting.FogEnd=1e9 else Lighting.FogEnd=1000 end end,false)
@@ -595,6 +668,7 @@ do
     -- per-game modules with tag filters
     local function addWorldTagESP(tagList, fill, outline)
         clearWorldESP()
+        worldEspState = {tags=tagList, fill=fill, outline=outline}
         for _,d in ipairs(workspace:GetDescendants()) do
             if d:IsA("BasePart") then
                 for _,tag in ipairs(tagList) do
@@ -619,6 +693,10 @@ do
                 clearWorldESP()
             end
         end)
+        makeSlider(p,"Auto-cast delay",0,2,config.fisch.autoCastDelay or 0.6,function(v) config.fisch.autoCastDelay=v end)
+        makeSlider(p,"Auto-reel delay",0,2,config.fisch.autoReelDelay or 0.4,function(v) config.fisch.autoReelDelay=v end)
+        local rarityBox=Instance.new("TextBox"); rarityBox.Size=UDim2.new(1,-10,0,30); rarityBox.BackgroundColor3=colors.bg; rarityBox.TextColor3=colors.text; rarityBox.Text=config.fisch.rarityFilter; rarityBox.PlaceholderText="Rarity filter (comma)"; rarityBox.BorderSizePixel=0; rarityBox.Font=Enum.Font.Gotham; rarityBox.TextSize=14; makeCorner(rarityBox,8); rarityBox.Parent=p; rarityBox.FocusLost:Connect(function() config.fisch.rarityFilter=rarityBox.Text end)
+        makeSlider(p,"Auto-sell value >=",0,500,config.fisch.autoSellThreshold or 0,function(v) config.fisch.autoSellThreshold=v end)
     end
     if isForge then
         local forgeFilter=Instance.new("TextBox"); forgeFilter.Size=UDim2.new(1,-10,0,30); forgeFilter.BackgroundColor3=colors.bg; forgeFilter.TextColor3=colors.text; forgeFilter.Text="ore,anvil,forge,smelt"; forgeFilter.PlaceholderText="Tags: ore,anvil,forge"; forgeFilter.BorderSizePixel=0; forgeFilter.Font=Enum.Font.Gotham; forgeFilter.TextSize=14; makeCorner(forgeFilter,8); forgeFilter.Parent=p
@@ -632,6 +710,9 @@ do
             end
         end)
         makeToggle(p,"Forge: Auto Interact prompts",function(on) config.autoInteractFilter="forge,smelt,anvil"; autoInteractEnabled=on end)
+        makeToggle(p,"Auto insert ores",function(on) config.forge.autoInsert=on end, config.forge.autoInsert)
+        makeToggle(p,"Auto collect ingots",function(on) config.forge.autoCollect=on end, config.forge.autoCollect)
+        makeSlider(p,"Anvil timing tolerance",0,0.5,config.forge.anvilTolerance or 0.18,function(v) config.forge.anvilTolerance=v end)
     end
 end
 
@@ -691,6 +772,44 @@ do
             toast("listfiles not available")
         end
     end)
+    local recentFrame=Instance.new("Frame"); recentFrame.Size=UDim2.new(1,-10,0,70); recentFrame.BackgroundColor3=colors.panel; recentFrame.BorderSizePixel=0; makeCorner(recentFrame,10); recentFrame.Parent=p
+    local rfList=Instance.new("UIListLayout",recentFrame); rfList.FillDirection=Enum.FillDirection.Horizontal; rfList.Padding=UDim.new(0,6); rfList.VerticalAlignment=Enum.VerticalAlignment.Center; rfList.HorizontalAlignment=Enum.HorizontalAlignment.Center
+    local function refreshRecent()
+        for _,c in ipairs(recentFrame:GetChildren()) do if c:IsA("TextButton") then c:Destroy() end end
+        for i,name in ipairs(config.recentConfigs) do
+            local b=Instance.new("TextButton"); b.Size=UDim2.fromOffset(120,28); b.BackgroundColor3=colors.bg; b.BorderSizePixel=0; b.TextColor3=colors.text; b.Font=Enum.Font.Gotham; b.TextSize=13; b.Text=name; makeCorner(b,8); b.Parent=recentFrame
+            b.MouseButton1Click:Connect(function()
+                loadConfigFromFile(name)
+                config.lastConfig = name
+                pushLog("Quick-loaded "..name)
+            end)
+        end
+    end
+    refreshRecent()
+    local kbFrame=Instance.new("Frame"); kbFrame.Size=UDim2.new(1,-10,0,140); kbFrame.BackgroundColor3=colors.panel; kbFrame.BorderSizePixel=0; makeCorner(kbFrame,10); kbFrame.Parent=p
+    local kbList=Instance.new("UIListLayout",kbFrame); kbList.Padding=UDim.new(0,6); kbList.FillDirection=Enum.FillDirection.Vertical; kbList.HorizontalAlignment=Enum.HorizontalAlignment.Left
+    local function addKeybindRow(label, keyPath)
+        local row=Instance.new("Frame"); row.Size=UDim2.new(1,-12,0,26); row.BackgroundTransparency=1; row.Parent=kbFrame
+        local l=Instance.new("TextLabel"); l.BackgroundTransparency=1; l.Size=UDim2.new(0.5,0,1,0); l.Font=Enum.Font.Gotham; l.TextColor3=colors.text; l.TextSize=13; l.TextXAlignment=Enum.TextXAlignment.Left; l.Text=label; l.Parent=row
+        local b=Instance.new("TextButton"); b.Size=UDim2.new(0.5,-4,1,0); b.Position=UDim2.new(0.5,4,0,0); b.BackgroundColor3=colors.bg; b.BorderSizePixel=0; b.TextColor3=colors.text; b.Font=Enum.Font.GothamSemibold; b.TextSize=13; b.Text=tostring(keyPath()); makeCorner(b,8); b.Parent=row
+        b.MouseButton1Click:Connect(function()
+            b.Text = "Press key..."
+            local conn; conn = UserInputService.InputBegan:Connect(function(inp)
+                if inp.UserInputType == Enum.UserInputType.Keyboard then
+                    conn:Disconnect()
+                    b.Text = tostring(inp.KeyCode)
+                    keyPath(inp.KeyCode)
+                end
+            end)
+        end)
+    end
+    addKeybindRow("Toggle UI", function(k) if k then config.menuKey=k end return config.menuKey end)
+    addKeybindRow("Soft Panic", function(k) if k then config.panicKey=k end return config.panicKey end)
+    addKeybindRow("Toggle Aimbot", function(k) if k then config.keybinds.toggleAimbot=k end return config.keybinds.toggleAimbot end)
+    addKeybindRow("Toggle ESP", function(k) if k then config.keybinds.toggleESP=k end return config.keybinds.toggleESP end)
+    addKeybindRow("Toggle Fly", function(k) if k then config.keybinds.toggleFly=k end return config.keybinds.toggleFly end)
+    addKeybindRow("Toggle Noclip", function(k) if k then config.keybinds.toggleNoclip=k end return config.keybinds.toggleNoclip end)
+    addKeybindRow("Toggle Overlay", function(k) if k then config.overlayToggleKey=k end return config.overlayToggleKey end)
 end
 
 -- Protection
@@ -757,6 +876,21 @@ end
 -- Overlay HUD + Quick Bar
 local overlay = Instance.new("Frame"); overlay.Size=UDim2.new(0,220,0,24); overlay.Position=UDim2.new(0,8,0,8); overlay.BackgroundColor3=Color3.fromRGB(0,0,0); overlay.BackgroundTransparency=0.35; overlay.BorderSizePixel=0; overlay.Parent=gui; makeCorner(overlay,8); makeDraggable(overlay)
 local overlayLabel=Instance.new("TextLabel"); overlayLabel.BackgroundTransparency=1; overlayLabel.Size=UDim2.new(1,-10,1,0); overlayLabel.Position=UDim2.new(0,6,0,0); overlayLabel.Font=Enum.Font.GothamSemibold; overlayLabel.TextColor3=Color3.new(1,1,1); overlayLabel.TextSize=13; overlayLabel.TextXAlignment=Enum.TextXAlignment.Left; overlayLabel.Parent=overlay
+local function applyOverlayDock(pos)
+    config.overlayDock = pos or config.overlayDock
+    if pos=="TR" then overlay.Position=UDim2.new(1,-overlay.Size.X.Offset-8,0,8)
+    elseif pos=="BL" then overlay.Position=UDim2.new(0,8,1,-overlay.Size.Y.Offset-8)
+    elseif pos=="BR" then overlay.Position=UDim2.new(1,-overlay.Size.X.Offset-8,1,-overlay.Size.Y.Offset-8)
+    else overlay.Position=UDim2.new(0,8,0,8) end
+end
+applyOverlayDock(config.overlayDock or "TL")
+local dockBar=Instance.new("Frame"); dockBar.Size=UDim2.new(0,100,0,18); dockBar.Position=UDim2.new(1,-110,1,-22); dockBar.BackgroundTransparency=1; dockBar.Parent=overlay
+local dockList=Instance.new("UIListLayout", dockBar); dockList.FillDirection=Enum.FillDirection.Horizontal; dockList.Padding=UDim.new(0,4); dockList.HorizontalAlignment=Enum.HorizontalAlignment.Right
+local function dockButton(label,key)
+    local b=Instance.new("TextButton"); b.Size=UDim2.fromOffset(22,18); b.BackgroundColor3=Color3.fromRGB(30,30,30); b.BorderSizePixel=0; b.TextColor3=Color3.new(1,1,1); b.TextSize=12; b.Font=Enum.Font.GothamSemibold; b.Text=label; makeCorner(b,6); b.Parent=dockBar
+    b.MouseButton1Click:Connect(function() applyOverlayDock(key) end)
+end
+dockButton("TL","TL"); dockButton("TR","TR"); dockButton("BL","BL"); dockButton("BR","BR")
 
 local quickBar = Instance.new("Frame"); quickBar.Size=UDim2.new(0,260,0,32); quickBar.Position=UDim2.new(1,-280,1,-48); quickBar.BackgroundColor3=Color3.fromRGB(0,0,0); quickBar.BackgroundTransparency=0.35; quickBar.BorderSizePixel=0; quickBar.Parent=gui; makeCorner(quickBar,10); makeDraggable(quickBar); quickBar.Visible=config.showQuickbar
 local qList=Instance.new("UIListLayout",quickBar); qList.FillDirection=Enum.FillDirection.Horizontal; qList.Padding=UDim.new(0,6); qList.VerticalAlignment=Enum.VerticalAlignment.Center; qList.HorizontalAlignment=Enum.HorizontalAlignment.Center
@@ -778,13 +912,16 @@ UserInputService.InputBegan:Connect(function(input,gp)
     if gp then return end
     if input.KeyCode == config.menuKey then
         hidden = not hidden
-        tween(main, 0.22, {Position = hidden and UDim2.new(0.5, -320, 1.1, 0) or UDim2.new(0.5, -320, 0.5, -240)})
+        if config.animations then
+            tween(main, 0.22, {Position = hidden and UDim2.new(0.5, -320, 1.1, 0) or UDim2.new(0.5, -320, 0.5, -240)})
+        else
+            main.Position = hidden and UDim2.new(0.5, -320, 1.1, 0) or UDim2.new(0.5, -320, 0.5, -240)
+        end
         main.Active = not hidden
         gui.Enabled = not hidden
         fovCircle.Visible = config.aimbotEnabled and not hidden
     elseif input.KeyCode == config.panicKey then
-        clearESP(); gui:Destroy(); offscreenGui:Destroy(); setBlur(false)
-        Hum.WalkSpeed = wsDefault; Hum.JumpPower = jpDefault; workspace.Gravity=gravityDefault
+        softPanic()
     elseif input.KeyCode == config.keybinds.toggleAimbot then config.aimbotEnabled=not config.aimbotEnabled; fovCircle.Visible=config.aimbotEnabled
     elseif input.KeyCode == config.keybinds.toggleESP then config.esp.enabled=not config.esp.enabled; clearESP(); if config.esp.enabled then for _,pl in ipairs(Players:GetPlayers()) do addESP(pl) end end
     elseif input.KeyCode == config.keybinds.toggleFly then flyEnabled=not flyEnabled
@@ -890,6 +1027,17 @@ task.spawn(function()
             end
         end
         task.wait(0.5)
+    end
+end)
+
+task.spawn(function()
+    while true do
+        if worldEspState.tags and config.worldScanInterval and config.worldScanInterval > 0 then
+            addWorldTagESP(worldEspState.tags, worldEspState.fill or colors.accent, worldEspState.outline or colors.accent2)
+            task.wait(config.worldScanInterval)
+        else
+            task.wait(1)
+        end
     end
 end)
 
