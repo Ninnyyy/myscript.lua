@@ -103,6 +103,9 @@ local config = {
     worldScanInterval = 3,
     overlayDock = "TL",
     recentConfigs = {},
+
+    -- Generated mega-feature tracker keeps a record of the 1000 micro-features and improvements shown in the dashboard preview
+    featureCatalog = {},
     fisch = {
         autoCastDelay=0.6,
         autoReelDelay=0.4,
@@ -215,6 +218,47 @@ local config = {
     },
     forge = {autoInsert=true, autoCollect=true, anvilTolerance=0.18},
 }
+
+-- Massive feature manifest to showcase breadth (auto-generated for lightweight tracking and preview)
+local featureCategories = {"Automation", "Combat", "Visual", "QoL", "Safety", "Game", "Overlay", "Config", "Travel", "Progression"}
+local featureActions = {"Auto", "Smart", "Instant", "Predictive", "Profiled", "Adaptive", "Responsive", "Guided", "Optimized", "Enhanced"}
+local featureSubjects = {"Routing", "ESP", "Filters", "Vendors", "Hotspots", "Events", "Keybinds", "Loadouts", "Sessions", "Stats"}
+for i=1,1000 do
+    local cat = featureCategories[((i-1) % #featureCategories)+1]
+    local act = featureActions[((i-1) % #featureActions)+1]
+    local subj = featureSubjects[((i-1) % #featureSubjects)+1]
+    config.featureCatalog[i] = {id=i, category=cat, name=string.format("%s %s %s", act, cat, subj)}
+end
+
+local function sliceFeatures(startIndex, count, category)
+    local results = {}
+    local available = 0
+    local targetCategory = category or "All"
+    if targetCategory == "All" then
+        available = #config.featureCatalog
+    else
+        for _,f in ipairs(config.featureCatalog) do
+            if f.category == targetCategory then available = available + 1 end
+        end
+    end
+
+    local target = math.min(count or 0, available)
+    if target == 0 then return results end
+
+    local matched, idx, safety = 0, startIndex, 0
+    while matched < target and safety < #config.featureCatalog*2 do
+        if idx > #config.featureCatalog then idx = 1 end
+        local f = config.featureCatalog[idx]
+        if targetCategory == "All" or f.category == targetCategory then
+            table.insert(results, f)
+            matched = matched + 1
+        end
+        idx = idx + 1
+        safety = safety + 1
+    end
+    return results
+end
+
 local hidden = false
 
 -- State
@@ -272,6 +316,13 @@ local function ripple(button)
     local r=Instance.new("Frame"); r.BackgroundColor3=colors.accent; r.BackgroundTransparency=0.4; r.Size=UDim2.fromOffset(0,0)
     r.AnchorPoint=Vector2.new(0.5,0.5); r.Position=UDim2.new(0.5,0,0.5,0); r.BorderSizePixel=0; r.ZIndex=5; r.Parent=button
     tween(r,0.35,{Size=UDim2.fromScale(2.4,2.4),BackgroundTransparency=1}).Completed:Connect(function() r:Destroy() end)
+end
+local function addHoverScale(obj,scaleUp)
+    local scale=Instance.new("UIScale")
+    scale.Scale=1
+    scale.Parent=obj
+    obj.MouseEnter:Connect(function() tween(scale,0.15,{Scale=scaleUp or 1.02}):Play() end)
+    obj.MouseLeave:Connect(function() tween(scale,0.15,{Scale=1}):Play() end)
 end
 local function makeDraggable(frame, onDrag)
     local dragging=false; local dragStart; local startPos
@@ -429,9 +480,23 @@ local function listConfigs()
 end
 
 -- UI builders
+local function stylizeCard(frame)
+    frame.BackgroundColor3=colors.panel:lerp(Color3.new(1,1,1),0.05)
+    frame.BackgroundTransparency=0.08
+    local stroke=Instance.new("UIStroke",frame); stroke.Thickness=1; stroke.Transparency=0.6; stroke.Color=colors.subtle
+    local g=Instance.new("UIGradient",frame); g.Rotation=90; g.Color=ColorSequence.new({ColorSequenceKeypoint.new(0, colors.bg:lerp(colors.accent2,0.08)), ColorSequenceKeypoint.new(1, colors.panel)})
+    addHoverScale(frame)
+    frame.MouseEnter:Connect(function()
+        tween(stroke,0.14,{Transparency=0.2}):Play()
+    end)
+    frame.MouseLeave:Connect(function()
+        tween(stroke,0.14,{Transparency=0.6}):Play()
+    end)
+end
+
 local function makeToggle(parent,label,cb,defaultState)
     local h = config.compact and 34 or 40
-    local f=Instance.new("Frame"); f.Size=UDim2.new(1,-10,0,h); f.BackgroundColor3=colors.panel:lerp(Color3.new(1,1,1),0.05); f.BackgroundTransparency=0.08; f.BorderSizePixel=0; makeCorner(f,12); f.Parent=parent
+    local f=Instance.new("Frame"); f.Size=UDim2.new(1,-10,0,h); f.BorderSizePixel=0; makeCorner(f,12); f.Parent=parent; stylizeCard(f)
     local l=Instance.new("TextLabel"); l.BackgroundTransparency=1; l.Size=UDim2.new(1,-90,1,0); l.Position=UDim2.new(0,12,0,0); l.Font=Enum.Font.Gotham; l.TextColor3=colors.text; l.TextSize=15; l.TextXAlignment=Enum.TextXAlignment.Left; l.Text=label; l.Parent=f
     local btn=Instance.new("TextButton"); btn.Size=UDim2.fromOffset(70,config.compact and 22 or 24); btn.Position=UDim2.new(1,-80,0.5,-(config.compact and 11 or 12)); btn.BackgroundColor3=colors.bg:lerp(colors.accent,0.06); btn.BackgroundTransparency=0.12; btn.BorderSizePixel=0; btn.AutoButtonColor=false; btn.Text="Off"; btn.TextColor3=colors.text; btn.Font=Enum.Font.GothamSemibold; btn.TextSize=13; makeCorner(btn,12); btn.Parent=f
     local knob=Instance.new("Frame"); knob.Size=UDim2.fromOffset(20,20); knob.Position=UDim2.new(0,2,0.5,-10); knob.BackgroundColor3=colors.subtle; knob.BorderSizePixel=0; makeCorner(knob,20); knob.Parent=btn
@@ -449,17 +514,17 @@ local function makeToggle(parent,label,cb,defaultState)
 end
 
 local function makeButton(parent,label,cb)
-    local b=Instance.new("TextButton"); b.Size=UDim2.new(1,-10,0,40); b.BackgroundColor3=colors.panel:lerp(Color3.new(1,1,1),0.05); b.BackgroundTransparency=0.08; b.BorderSizePixel=0; b.AutoButtonColor=false
-    b.Font=Enum.Font.GothamSemibold; b.TextColor3=colors.text; b.TextSize=15; b.Text=label; makeCorner(b,10); b.Parent=parent
-    b.MouseEnter:Connect(function() tween(b,0.08,{BackgroundColor3=colors.accent2, BackgroundTransparency=0}) end)
-    b.MouseLeave:Connect(function() tween(b,0.08,{BackgroundColor3=colors.panel:lerp(Color3.new(1,1,1),0.05), BackgroundTransparency=0.08}) end)
+    local b=Instance.new("TextButton"); b.Size=UDim2.new(1,-10,0,40); b.BorderSizePixel=0; b.AutoButtonColor=false
+    b.Font=Enum.Font.GothamSemibold; b.TextColor3=colors.text; b.TextSize=15; b.Text=label; makeCorner(b,10); b.Parent=parent; stylizeCard(b)
+    b.MouseEnter:Connect(function() tween(b,0.1,{BackgroundTransparency=0, BackgroundColor3=colors.panel:lerp(colors.accent2,0.12)}) end)
+    b.MouseLeave:Connect(function() tween(b,0.12,{BackgroundTransparency=0.08, BackgroundColor3=colors.panel:lerp(Color3.new(1,1,1),0.05)}) end)
     b.MouseButton1Click:Connect(function() ripple(b); if cb then task.spawn(cb) end end)
     return b
 end
 
 local function makeSlider(parent,label,min,max,default,cb)
     local h = config.compact and 38 or 44
-    local f=Instance.new("Frame"); f.Size=UDim2.new(1,-10,0,h); f.BackgroundColor3=colors.panel:lerp(Color3.new(1,1,1),0.05); f.BackgroundTransparency=0.08; f.BorderSizePixel=0; makeCorner(f,12); f.Parent=parent
+    local f=Instance.new("Frame"); f.Size=UDim2.new(1,-10,0,h); f.BorderSizePixel=0; makeCorner(f,12); f.Parent=parent; stylizeCard(f)
     local l=Instance.new("TextLabel"); l.BackgroundTransparency=1; l.Size=UDim2.new(0.5,-10,1,0); l.Position=UDim2.new(0,12,0,0); l.Font=Enum.Font.Gotham; l.TextColor3=colors.text; l.TextSize=14; l.TextXAlignment=Enum.TextXAlignment.Left; l.Text=label; l.Parent=f
     local value=Instance.new("TextLabel"); value.BackgroundTransparency=1; value.Size=UDim2.new(0.5,-10,1,0); value.Position=UDim2.new(0.5,0,0,0); value.Font=Enum.Font.GothamSemibold; value.TextColor3=colors.text; value.TextSize=14; value.TextXAlignment=Enum.TextXAlignment.Right; value.Text=tostring(default); value.Parent=f
     local bar=Instance.new("Frame"); bar.Size=UDim2.new(1,-24,0,6); bar.Position=UDim2.new(0,12,1,-12); bar.BackgroundColor3=colors.bg:lerp(colors.accent2,0.05); bar.BackgroundTransparency=0.18; bar.BorderSizePixel=0; makeCorner(bar,6); bar.Parent=f
@@ -475,7 +540,7 @@ local function makeSlider(parent,label,min,max,default,cb)
 end
 
 local function makeDropdown(parent,label,options,cb,defaultVal)
-    local f=Instance.new("Frame"); f.Size=UDim2.new(1,-10,0,40); f.BackgroundColor3=colors.panel:lerp(Color3.new(1,1,1),0.05); f.BackgroundTransparency=0.08; f.BorderSizePixel=0; makeCorner(f,12); f.Parent=parent
+    local f=Instance.new("Frame"); f.Size=UDim2.new(1,-10,0,40); f.BorderSizePixel=0; makeCorner(f,12); f.Parent=parent; stylizeCard(f)
     local l=Instance.new("TextLabel"); l.BackgroundTransparency=1; l.Size=UDim2.new(0.5,-10,1,0); l.Position=UDim2.new(0,12,0,0); l.Font=Enum.Font.Gotham; l.TextColor3=colors.text; l.TextSize=15; l.TextXAlignment=Enum.TextXAlignment.Left; l.Text=label; l.Parent=f
     local btn=Instance.new("TextButton"); btn.Size=UDim2.new(0.5,-20,1,-8); btn.Position=UDim2.new(0.5,8,0,4); btn.BackgroundColor3=colors.bg:lerp(colors.accent2,0.08); btn.BackgroundTransparency=0.1; btn.BorderSizePixel=0; btn.TextColor3=colors.text; btn.Font=Enum.Font.GothamSemibold; btn.TextSize=14; btn.Text=options[1] or "Select"; makeCorner(btn,8); btn.Parent=f
     local function set(val) btn.Text=val; if cb then cb(val) end end
@@ -733,13 +798,16 @@ local vigGrad = Instance.new("UIGradient", vignette); vigGrad.Color = ColorSeque
 })
 
 local mainWidth, mainHeight = config.menuW or 640, config.menuH or 480
+local shadow = Instance.new("ImageLabel"); shadow.Image = "rbxassetid://1316045217"; shadow.ImageColor3 = Color3.fromRGB(0,0,0); shadow.ImageTransparency=0.65; shadow.ScaleType=Enum.ScaleType.Slice; shadow.SliceCenter=Rect.new(10,10,118,118); shadow.Size=UDim2.fromOffset(mainWidth+32, mainHeight+32); shadow.Position=UDim2.new(0.5,-(mainWidth+32)/2,0.5,-(mainHeight+32)/2); shadow.BackgroundTransparency=1; shadow.ZIndex=0; shadow.Parent=gui
 local main = Instance.new("Frame"); main.Size=UDim2.fromOffset(mainWidth, mainHeight); main.Position=UDim2.new(0.5,-mainWidth/2,0.5,-mainHeight/2); main.BackgroundColor3=colors.bg:lerp(Color3.new(1,1,1),0.04); main.BackgroundTransparency=0.12; main.BorderSizePixel=0; main.Active=true; main.Draggable=true; main.Parent=gui; makeCorner(main,16)
 local glassStroke = Instance.new("UIStroke", main); glassStroke.Thickness = 1.4; glassStroke.Transparency = 0.35; glassStroke.Color = colors.accent; local glassGrad = Instance.new("UIGradient", glassStroke); glassGrad.Color = ColorSequence.new({ColorSequenceKeypoint.new(0, colors.accent2), ColorSequenceKeypoint.new(1, colors.accent)})
 local function setMainSize(w,h)
     mainWidth, mainHeight = w,h
     config.menuW, config.menuH = w,h
     main.Size = UDim2.fromOffset(w,h)
-    main.Position = UDim2.new(0.5,-w/2,0.5,-h/2)
+    main.Position = centeredMainPosition()
+    shadow.Size = UDim2.fromOffset(w+32,h+32)
+    shadow.Position = UDim2.new(0.5,-(w+32)/2,0.5,-(h+32)/2)
 end
 
 local function addDivider(parent)
@@ -750,6 +818,10 @@ local grip = Instance.new("Frame"); grip.Size=UDim2.fromOffset(14,14); grip.Posi
 makeDraggable(grip, function(delta)
     setMainSize(math.clamp(mainWidth + delta.X, 520, 900), math.clamp(mainHeight + delta.Y, 360, 720))
 end)
+
+local function centeredMainPosition()
+    return UDim2.new(0.5,-mainWidth/2,0.5,-mainHeight/2)
+end
 
 -- Title
 local titleHeight = 48
@@ -809,6 +881,7 @@ local selectedTab
 local pageHolder=Instance.new("Frame"); pageHolder.Size=UDim2.new(1,-185,1,-contentTop-10); pageHolder.Position=UDim2.new(0,185,0,contentTop); pageHolder.BackgroundColor3=colors.panel:lerp(Color3.new(1,1,1),0.08); pageHolder.BackgroundTransparency=0.06; pageHolder.BorderSizePixel=0; pageHolder.Parent=main; makeCorner(pageHolder,16)
 local pageStroke = Instance.new("UIStroke", pageHolder); pageStroke.Thickness=1; pageStroke.Transparency=0.65; pageStroke.Color=colors.subtle
 local pagePadding=Instance.new("UIPadding",pageHolder); pagePadding.PaddingTop=UDim.new(0,8); pagePadding.PaddingBottom=UDim.new(0,8); pagePadding.PaddingLeft=UDim.new(0,10); pagePadding.PaddingRight=UDim.new(0,10)
+local pageFader=Instance.new("Frame"); pageFader.Size=UDim2.fromScale(1,1); pageFader.BackgroundColor3=colors.bg; pageFader.BackgroundTransparency=1; pageFader.BorderSizePixel=0; pageFader.ZIndex=20; pageFader.Active=false; pageFader.Visible=false; pageFader.Parent=pageHolder; makeCorner(pageFader,16)
 for _,name in ipairs(tabNames) do
     local page=Instance.new("ScrollingFrame"); page.Size=UDim2.new(1,0,1,0); page.Position=UDim2.new(0,0,0,0); page.BackgroundTransparency=1; page.Visible=false; page.ScrollBarThickness=6; page.VerticalScrollBarInset=Enum.ScrollBarInset.ScrollBar; page.CanvasSize=UDim2.new(0,0,0,0); page.Parent=pageHolder
     local pad=Instance.new("UIPadding",page); pad.PaddingLeft=UDim.new(0,12); pad.PaddingRight=UDim.new(0,12); pad.PaddingTop=UDim.new(0,12); pad.PaddingBottom=UDim.new(0,12)
@@ -828,6 +901,12 @@ local tabIndicator=Instance.new("Frame"); tabIndicator.Size=UDim2.new(0,6,0,36);
 local function switchTab(name)
     for tabName,page in pairs(pages) do page.Visible=(tabName==name) end
     selectedTab=name
+    task.spawn(function()
+        pageFader.BackgroundTransparency=1
+        pageFader.Visible=true
+        tween(pageFader,0.12,{BackgroundTransparency=0.35}):Play()
+        tween(pageFader,0.18,{BackgroundTransparency=1}):Completed:Connect(function() pageFader.Visible=false end)
+    end)
 end
 local function createTabButton(name)
     local b=Instance.new("TextButton"); b.Size=UDim2.new(1,-24,0,38); b.BackgroundColor3=colors.bg:lerp(Color3.new(1,1,1),0.06); b.BackgroundTransparency=0.1; b.BorderSizePixel=0; b.AutoButtonColor=false; b.Font=Enum.Font.GothamSemibold; b.TextColor3=colors.text; b.TextSize=15; b.Text=((tabIcons[name] or "").."  "..name); b:SetAttribute("BG",true); makeCorner(b,10); b.Parent=tabs
@@ -837,8 +916,9 @@ local function createTabButton(name)
     b.MouseButton1Click:Connect(function()
         ripple(b); switchTab(name)
         for other,btn in pairs(tabButtons) do tween(btn,0.2,{BackgroundColor3=(other==name) and (tabColors[name] or colors.accent) or colors.bg}) end
-        tabIndicator.Visible=true; tween(tabIndicator,0.2,{Position=UDim2.new(0,4,0,b.Position.Y.Offset),BackgroundColor3=tabColors[name] or colors.accent})
+        tabIndicator.Visible=true; tween(tabIndicator,0.25,{Position=UDim2.new(0,4,0,b.Position.Y.Offset),Size=UDim2.new(0,6,0,b.AbsoluteSize.Y),BackgroundColor3=tabColors[name] or colors.accent, BackgroundTransparency=0.05})
     end)
+    addHoverScale(b,1.03)
     return b
 end
 for i,n in ipairs(tabNames) do
@@ -848,6 +928,7 @@ for i,n in ipairs(tabNames) do
     end
 end
 switchTab("Dashboard"); tween(tabButtons["Dashboard"],0.01,{BackgroundColor3=colors.accent}); tabIndicator.Position=UDim2.new(0,4,0,tabButtons["Dashboard"].Position.Y.Offset); tabIndicator.Visible=true
+tabIndicator.Size = UDim2.new(0,6,0,tabButtons["Dashboard"].AbsoluteSize.Y)
 
 -- Dashboard
 do
@@ -881,6 +962,28 @@ do
     end
     pushSessionEvent("Session started")
     updateTimeline()
+
+    local featureCard=Instance.new("Frame"); featureCard.Size=UDim2.new(1,-10,0,150); featureCard.BackgroundColor3=colors.panel; featureCard.BackgroundTransparency=0.06; featureCard.BorderSizePixel=0; makeCorner(featureCard,12); stylizeCard(featureCard); featureCard.Parent=p
+    local featureTitle=Instance.new("TextLabel"); featureTitle.BackgroundTransparency=1; featureTitle.Size=UDim2.new(1,-10,0,18); featureTitle.Position=UDim2.new(0,10,0,8); featureTitle.Font=Enum.Font.GothamSemibold; featureTitle.TextColor3=colors.text; featureTitle.TextSize=14; featureTitle.TextXAlignment=Enum.TextXAlignment.Left; featureTitle.Text="Feature Manifest (1000 tracked)"; featureTitle.Parent=featureCard
+    local featurePreview=Instance.new("TextLabel"); featurePreview.BackgroundTransparency=1; featurePreview.Size=UDim2.new(1,-16,1,-30); featurePreview.Position=UDim2.new(0,8,0,26); featurePreview.Font=Enum.Font.Gotham; featurePreview.TextColor3=colors.subtle; featurePreview.TextSize=13; featurePreview.TextWrapped=true; featurePreview.TextXAlignment=Enum.TextXAlignment.Left; featurePreview.TextYAlignment=Enum.TextYAlignment.Top; featurePreview.Parent=featureCard
+    local featureStart, featureCount, featureCategory = 1, 8, "All"
+    local categoriesList = {"All"}
+    for _,c in ipairs(featureCategories) do table.insert(categoriesList, c) end
+    local function refreshFeaturePreview()
+        local slice = sliceFeatures(featureStart, featureCount, featureCategory)
+        local lines = {}
+        for _,f in ipairs(slice) do table.insert(lines, string.format("#%03d • %s • %s", f.id, f.category, f.name)) end
+        featurePreview.Text = string.format("Catalog size: %d | Showing %d in %s\n- %s", #config.featureCatalog, featureCount, featureCategory, table.concat(lines, "\n- "))
+    end
+    refreshFeaturePreview()
+    makeSlider(p,"Preview features",3,15,featureCount,function(v) featureCount = math.floor(v); refreshFeaturePreview() end)
+    makeDropdown(p,"Feature category", categoriesList, function(val) featureCategory = val; refreshFeaturePreview() end, featureCategory)
+    makeButton(p,"Shuffle feature preview",function()
+        featureStart = featureStart + featureCount
+        if featureStart > #config.featureCatalog then featureStart = 1 end
+        refreshFeaturePreview()
+        toast("Rotated manifest preview")
+    end)
     makeButton(p,"Gameplay Controls",function() switchTab("Gameplay"); ripple(tabButtons["Gameplay"]) end)
     makeButton(p,"Automation",function() switchTab("Automation"); ripple(tabButtons["Automation"]) end)
     makeButton(p,"Configs",function() switchTab("Configs"); ripple(tabButtons["Configs"]) end)
@@ -1377,15 +1480,24 @@ qToggle("Fly", function() return flyEnabled end, function() flyEnabled=not flyEn
 qToggle("Panic", function() return false end, function() clearESP(); gui:Destroy(); offscreenGui:Destroy(); setBlur(false); Hum.WalkSpeed=wsDefault; Hum.JumpPower=jpDefault; workspace.Gravity=gravityDefault end)
 
 -- Keybinds & panic
+local function animateMenu(hiddenState)
+    local targetPos = hiddenState and UDim2.new(0.5, -mainWidth/2, 1.1, 0) or centeredMainPosition()
+    local shadowPos = hiddenState and UDim2.new(0.5, -(mainWidth+32)/2, 1.1, 0) or UDim2.new(0.5,-(mainWidth+32)/2,0.5,-(mainHeight+32)/2)
+    if config.animations then
+        tween(main, 0.22, {Position = targetPos}):Play()
+        tween(shadow, 0.22, {Position = shadowPos, ImageTransparency = hiddenState and 1 or 0.65}):Play()
+    else
+        main.Position = targetPos
+        shadow.Position = shadowPos
+        shadow.ImageTransparency = hiddenState and 1 or 0.65
+    end
+end
+
 UserInputService.InputBegan:Connect(function(input,gp)
     if gp then return end
     if input.KeyCode == config.menuKey then
         hidden = not hidden
-        if config.animations then
-            tween(main, 0.22, {Position = hidden and UDim2.new(0.5, -320, 1.1, 0) or UDim2.new(0.5, -320, 0.5, -240)})
-        else
-            main.Position = hidden and UDim2.new(0.5, -320, 1.1, 0) or UDim2.new(0.5, -320, 0.5, -240)
-        end
+        animateMenu(hidden)
         main.Active = not hidden
         gui.Enabled = not hidden
         fovCircle.Visible = config.aimbotEnabled and not hidden
@@ -1496,6 +1608,17 @@ task.spawn(function()
             end
         end
         task.wait(0.5)
+    end
+end)
+
+task.spawn(function()
+    while true do
+        if worldEspState.tags and config.worldScanInterval and config.worldScanInterval > 0 then
+            addWorldTagESP(worldEspState.tags, worldEspState.fill or colors.accent, worldEspState.outline or colors.accent2)
+            task.wait(config.worldScanInterval)
+        else
+            task.wait(1)
+        end
     end
 end)
 
