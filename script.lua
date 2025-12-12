@@ -1,5 +1,5 @@
--- Advanced Universal Hub v5.2
--- Menu key L, Panic RightControl by default.
+-- Wrap everything so execution errors surface as a toast instead of silently aborting
+local ok, err = pcall(function()
 
 -- Services
 local Players = game:GetService("Players")
@@ -1668,6 +1668,17 @@ end)
 
 task.spawn(function()
     while true do
+        if worldEspState.tags and config.worldScanInterval and config.worldScanInterval > 0 then
+            addWorldTagESP(worldEspState.tags, worldEspState.fill or colors.accent, worldEspState.outline or colors.accent2)
+            task.wait(config.worldScanInterval)
+        else
+            task.wait(1)
+        end
+    end
+end)
+
+task.spawn(function()
+    while true do
         if config.antiAfk then VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Right, false, nil); VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Right, false, nil) end
         task.wait(30)
     end
@@ -1716,3 +1727,17 @@ if config.disableInVIP and (game.PrivateServerId and game.PrivateServerId ~= "")
     autoDisable("VIP/Private")
 end
 toast("Loaded Advanced Universal Hub v"..config.version)
+
+end)
+
+if not ok then
+    warn("[Advanced Hub] load error:", err)
+    pcall(function()
+        local sg = game:GetService("StarterGui")
+        sg:SetCore("SendNotification", {
+            Title = "Advanced Hub",
+            Text = "Load error: " .. tostring(err),
+            Duration = 8,
+        })
+    end)
+end
