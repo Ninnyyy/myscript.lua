@@ -228,9 +228,18 @@ local blurEffect
 local sessionEvents = {}
 local updateTimeline
 local gameNameLower = string.lower(game.Name or "")
-local isFisch = game.PlaceId==16732694052 or gameNameLower:find("fisch")
-local isFishIt = gameNameLower:find("fish it") ~= nil or gameNameLower:find("fishit") ~= nil or gameNameLower:find("fish") ~= nil
-local isForge = gameNameLower:find("forge") ~= nil
+local fishItIds = {15557967605, 17180310686}
+local fischIds = {16732694052}
+local forgeIds = {22442260156}
+local function anyMatch(ids, names)
+    for _,id in ipairs(ids) do if game.PlaceId == id then return true end end
+    for _,name in ipairs(names) do if gameNameLower:find(name, 1, true) then return true end end
+    return false
+end
+local isFisch = anyMatch(fischIds, {"fisch"})
+local isFishIt = anyMatch(fishItIds, {"fish it", "fishit"})
+local isForge = anyMatch(forgeIds, {"the forge", "forge"})
+local detectedGame = isFisch and "Fisch" or isFishIt and "Fish It" or isForge and "Forge" or "Other"
 local flyEnabled, flyBV = false, nil
 local islandSpots = {}
 local noclipEnabled = false
@@ -791,9 +800,9 @@ local tabsStroke = Instance.new("UIStroke", tabs); tabsStroke.Thickness=1; tabsS
 local tabsGrad=Instance.new("UIGradient", tabs); tabsGrad.Rotation=90; tabsGrad.Color = ColorSequence.new({ColorSequenceKeypoint.new(0, colors.panel), ColorSequenceKeypoint.new(1, colors.bg:lerp(colors.accent2,0.06))})
 local tabsPad = Instance.new("UIPadding", tabs); tabsPad.PaddingLeft = UDim.new(0,8); tabsPad.PaddingRight = UDim.new(0,8); tabsPad.PaddingTop = UDim.new(0,10)
 local tabList=Instance.new("UIListLayout",tabs); tabList.VerticalAlignment=Enum.VerticalAlignment.Top; tabList.HorizontalAlignment=Enum.HorizontalAlignment.Center; tabList.Padding=UDim.new(0, config.compact and 6 or 8)
-local tabNames={"Dashboard","Movement","Visuals","Combat","Automation","Player List","Script Hub","Configs","Protection","UI / Theme"}
+local tabNames={"Dashboard","Gameplay","Automation","Visuals / UI","Configs"}
 local tabIcons={
-    Dashboard="🏠", Movement="🏃", Visuals="👁", Combat="🎯", Automation="⚙️", ["Player List"]="🧑", ["Script Hub"]="📜", Configs="💾", Protection="🛡", ["UI / Theme"]="🎨"
+    Dashboard="🏠", Gameplay="🎮", Automation="⚙️", ["Visuals / UI"]="👁", Configs="💾"
 }
 local pages={}
 local selectedTab
@@ -810,15 +819,10 @@ end
 local tabButtons={}
 local tabColors = {
     ["Dashboard"]=colors.accent,
-    ["Movement"]=Color3.fromRGB(30,160,90),
-    ["Visuals"]=Color3.fromRGB(60,140,255),
-    ["Combat"]=Color3.fromRGB(220,70,70),
+    ["Gameplay"]=Color3.fromRGB(30,160,90),
     ["Automation"]=Color3.fromRGB(200,140,60),
-    ["Player List"]=Color3.fromRGB(120,200,255),
-    ["Script Hub"]=Color3.fromRGB(200,140,255),
+    ["Visuals / UI"]=Color3.fromRGB(120,180,120),
     ["Configs"]=Color3.fromRGB(120,180,200),
-    ["Protection"]=Color3.fromRGB(180,160,80),
-    ["UI / Theme"]=Color3.fromRGB(120,180,120),
 }
 local tabIndicator=Instance.new("Frame"); tabIndicator.Size=UDim2.new(0,6,0,36); tabIndicator.BackgroundColor3=colors.accent; tabIndicator.BorderSizePixel=0; tabIndicator.Visible=false; tabIndicator.Parent=tabs; makeCorner(tabIndicator,3)
 local function switchTab(name)
@@ -877,14 +881,14 @@ do
     end
     pushSessionEvent("Session started")
     updateTimeline()
-    makeButton(p,"Universal Features",function() switchTab("Movement"); ripple(tabButtons["Movement"]) end)
-    makeButton(p,"Game-Specific Features",function() switchTab("Script Hub"); ripple(tabButtons["Script Hub"]) end)
+    makeButton(p,"Gameplay Controls",function() switchTab("Gameplay"); ripple(tabButtons["Gameplay"]) end)
+    makeButton(p,"Automation",function() switchTab("Automation"); ripple(tabButtons["Automation"]) end)
     makeButton(p,"Configs",function() switchTab("Configs"); ripple(tabButtons["Configs"]) end)
 end
 
--- Movement
+-- Gameplay (movement + combat + safety + player list)
 do
-    local p=pages["Movement"]
+    local p=pages["Gameplay"]
     makeSlider(p,"WalkSpeed",8,160,config.wsBoost,function(v) config.wsBoost=v; if Hum.WalkSpeed~=wsDefault then Hum.WalkSpeed=v end end)
     makeSlider(p,"JumpPower",20,150,config.jpBoost,function(v) config.jpBoost=v; if Hum.JumpPower~=jpDefault then Hum.JumpPower=v end end)
     makeToggle(p,"Speed Boost",function(on) Hum.WalkSpeed = on and config.wsBoost or wsDefault end)
@@ -946,9 +950,9 @@ do
     makeButton(p,"Hard Reset Character",function() LP:LoadCharacter() end)
 end
 
--- Visuals
+-- Visuals / UI
 do
-    local p=pages["Visuals"]
+    local p=pages["Visuals / UI"]
     makeToggle(p,"ESP (players)",function(on) config.esp.enabled=on; clearESP(); if on then for _,pl in ipairs(Players:GetPlayers()) do addESP(pl) end end end)
     makeToggle(p,"Box ESP",function(on) config.esp.boxes=on end,config.esp.boxes)
     makeToggle(p,"ESP Names",function(on) config.esp.names=on; clearESP(); if config.esp.enabled then for _,pl in ipairs(Players:GetPlayers()) do addESP(pl) end end end,config.esp.names)
@@ -1017,9 +1021,10 @@ local function getClosestTarget()
     return closest
 end
 
--- Combat
+-- Combat (merged under Gameplay)
 do
-    local p=pages["Combat"]
+    local p=pages["Gameplay"]
+    addDivider(p)
     makeToggle(p,"Aimbot (hold RMB)",function(on) config.aimbotEnabled=on; fovCircle.Visible=on and not hidden end)
     makeDropdown(p,"Aim Mode",{"Nearest Crosshair","Nearest Player"},function(v) config.aimbotMode=v end)
     makeDropdown(p,"Target Area",{"Head","Torso","Random"},function(v) config.aimbotArea=v end)
@@ -1048,7 +1053,7 @@ do
     if isFisch or isFishIt then
         buildFishAutomation(p)
     else
-        local note=Instance.new("TextLabel"); note.BackgroundTransparency=1; note.Size=UDim2.new(1,-10,0,36); note.Font=Enum.Font.Gotham; note.TextColor3=colors.subtle; note.TextSize=14; note.TextXAlignment=Enum.TextXAlignment.Left; note.TextWrapped=true; note.Text="Fish It automation appears here when you join Fisch/Fish It."; note.Parent=p
+        local note=Instance.new("TextLabel"); note.BackgroundTransparency=1; note.Size=UDim2.new(1,-10,0,36); note.Font=Enum.Font.Gotham; note.TextColor3=colors.subtle; note.TextSize=14; note.TextXAlignment=Enum.TextXAlignment.Left; note.TextWrapped=true; note.Text="Fish It/Fisch automation appears only in supported games. Detected: "..detectedGame.."."; note.Parent=p
     end
     if isForge then
         addDivider(p)
@@ -1056,10 +1061,11 @@ do
     end
 end
 
--- Player List
+-- Player List (merged under Gameplay)
 local priorityTarget=nil
 do
-    local p=pages["Player List"]
+    local p=pages["Gameplay"]
+    addDivider(p)
     local container=Instance.new("Frame"); container.Size=UDim2.new(1,-10,0,240); container.BackgroundColor3=colors.panel; container.BorderSizePixel=0; makeCorner(container,10); container.Parent=p
     local uiList=Instance.new("UIListLayout",container); uiList.FillDirection=Enum.FillDirection.Vertical; uiList.Padding=UDim.new(0,4); uiList.HorizontalAlignment=Enum.HorizontalAlignment.Left
     local function refresh()
@@ -1083,9 +1089,9 @@ do
     makeButton(p,"Clear Priority Target",function() priorityTarget=nil; camera.CameraSubject=LP.Character:FindFirstChild("Humanoid") end)
 end
 
--- Script Hub (stub)
+-- Script Hub (stub, merged into Automation)
 do
-    local p=pages["Script Hub"]
+    local p=pages["Automation"]
     local desc=Instance.new("TextLabel"); desc.BackgroundTransparency=1; desc.Size=UDim2.new(1,-10,0,40); desc.Font=Enum.Font.Gotham; desc.TextColor3=colors.text; desc.TextSize=14; desc.TextWrapped=true; desc.Text="Script Hub: favorites + auto-exec per game."; desc.Parent=p
     local execBox=Instance.new("TextBox"); execBox.Size=UDim2.new(1,-10,0,100); execBox.BackgroundColor3=colors.bg; execBox.TextColor3=colors.text; execBox.PlaceholderText="Paste script URL or code stub"; execBox.Text=""; execBox.ClearTextOnFocus=false; execBox.TextWrapped=true; execBox.TextXAlignment=Enum.TextXAlignment.Left; execBox.TextYAlignment=Enum.TextYAlignment.Top; execBox.BorderSizePixel=0; execBox.Font=Enum.Font.Gotham; execBox.TextSize=14; makeCorner(execBox,8); execBox.Parent=p
     makeButton(p,"Run Script",function() toast("Run your universal script here") end)
@@ -1238,9 +1244,10 @@ do
     addKeybindRow("Toggle Overlay", function(k) if k then config.overlayToggleKey=k end return config.overlayToggleKey end)
 end
 
--- Protection
+-- Protection (merged under Gameplay)
 do
-    local p=pages["Protection"]
+    local p=pages["Gameplay"]
+    addDivider(p)
     makeToggle(p,"Auto-disable on teleport",function(on) config.autoDisableOnTP=on end,config.autoDisableOnTP)
     makeToggle(p,"Stop features on panic",function(on) config.stopOnPanic=on end,config.stopOnPanic)
     makeToggle(p,"Low Profile Mode (visual only)",function(on) config.lowProfile=on end,false)
@@ -1274,9 +1281,10 @@ do
     makeButton(p,"Clear Whitelist",function() config.friendWhitelist={} pushLog("Whitelist cleared") end)
 end
 
--- UI / Theme
+-- UI / Theme (merged under Visuals / UI)
 do
-    local p=pages["UI / Theme"]
+    local p=pages["Visuals / UI"]
+    addDivider(p)
     makeDropdown(p,"Theme",{"Christmas","Midnight","NeoGreen","Amber","Purple"},function(v) config.theme=v; applyTheme(); pushSessionEvent("Theme: "..v) end)
     local themeGrid=Instance.new("Frame"); themeGrid.Size=UDim2.new(1,-10,0,92); themeGrid.BackgroundColor3=colors.panel; themeGrid.BorderSizePixel=0; makeCorner(themeGrid,10); themeGrid.Parent=p
     local gridPad=Instance.new("UIPadding",themeGrid); gridPad.PaddingTop=UDim.new(0,8); gridPad.PaddingBottom=UDim.new(0,8); gridPad.PaddingLeft=UDim.new(0,10); gridPad.PaddingRight=UDim.new(0,10)
@@ -1488,6 +1496,17 @@ task.spawn(function()
             end
         end
         task.wait(0.5)
+    end
+end)
+
+task.spawn(function()
+    while true do
+        if worldEspState.tags and config.worldScanInterval and config.worldScanInterval > 0 then
+            addWorldTagESP(worldEspState.tags, worldEspState.fill or colors.accent, worldEspState.outline or colors.accent2)
+            task.wait(config.worldScanInterval)
+        else
+            task.wait(1)
+        end
     end
 end)
 
