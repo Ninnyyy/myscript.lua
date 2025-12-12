@@ -135,6 +135,83 @@ local config = {
         fishHud=true,
         antiAfk=true,
         eventNotify=true,
+        perfectBias=true,
+        fullLoop=true,
+        mode="Balanced",
+    },
+    fishit = {
+        tpSpot="Ocean",
+        tpVendor="Shop",
+        tpUpgrade="Upgrade Station",
+        tpBait="Bait Vendor",
+        savedWaypoint="Favorite 1",
+        xpMode=false,
+        moneyMode=true,
+        autoSellFull=true,
+        autoSellRarity="Rare",
+        autoSellValue=250,
+        autoDiscardJunk=true,
+        lockFavorites=true,
+        sortMode="Rarity",
+        autoEquipBest=true,
+        autoUpgradeTarget=5,
+        autoBait=true,
+        loadout="Money Rod",
+        hotspotEsp=true,
+        vendorEsp=true,
+        pierLabels=true,
+        fullbright=true,
+        noFog=true,
+        fov=80,
+        overlayMode="Money/hour",
+        eventOnly=false,
+        tpEventOnStart=true,
+        antiAfk=true,
+        rejoinLowPop=false,
+        profile="Ocean Farm",
+    },
+    fischPro = {
+        mode="Always complete",
+        rarityTier="Rare+",
+        valueFilter=0,
+        whitelist="",
+        blacklist="",
+        targetProfile="XP grind",
+        region="Ocean",
+        routePreset="Snowcap cave route",
+        conditionPreset="Foggy night mythic",
+        autoSwitchTime=true,
+        autoSwitchWeather=true,
+        loadout="Deep ocean mythic",
+        baitRule="Don’t waste rare bait",
+        boatRoute="Harbor loop",
+        bestiaryFocus="Mythic",
+        hotspotEsp=true,
+        landmarkEsp=true,
+        mythicMarker=true,
+        autoSellRarity="Rare+",
+        autoSellValue=500,
+        lockFavorites=true,
+        profitTrack=true,
+        alertEvents=true,
+        bossTargets="",
+        antiAfk=true,
+        rejoinMode="None",
+        overlayProfile="Session",
+        theme="Nautical",
+    },
+    forgePlanner = {
+        tab="Home",
+        theme="Lava",
+        oreRoute="Goblin Caves",
+        oreGoal=1000,
+        recipeTag="DPS",
+        weaponProfile="Fire greatsword",
+        armorProfile="Goblin Cave tank set",
+        runePage="DPS page",
+        zoneRoute="Recommended order",
+        economyMode="Sell vs Forge",
+        overlay=true,
     },
     forge = {autoInsert=true, autoCollect=true, anvilTolerance=0.18},
 }
@@ -150,6 +227,10 @@ local worldHighlights = {}
 local blurEffect
 local sessionEvents = {}
 local updateTimeline
+local gameNameLower = string.lower(game.Name or "")
+local isFisch = game.PlaceId==16732694052 or gameNameLower:find("fisch")
+local isFishIt = gameNameLower:find("fish it") ~= nil or gameNameLower:find("fishit") ~= nil or gameNameLower:find("fish") ~= nil
+local isForge = gameNameLower:find("forge") ~= nil
 local flyEnabled, flyBV = false, nil
 local islandSpots = {}
 local noclipEnabled = false
@@ -404,6 +485,168 @@ end
 local function clearWorldESP()
     for _,o in ipairs(worldHighlights) do o:Destroy() end
     worldHighlights = {}
+end
+
+local function addWorldTagESP(tagList, fill, outline)
+    clearWorldESP()
+    worldEspState = {tags=tagList, fill=fill, outline=outline}
+    for _,d in ipairs(workspace:GetDescendants()) do
+        if d:IsA("BasePart") then
+            for _,tag in ipairs(tagList) do
+                if d.Name:lower():find(tag) then
+                    local h=Instance.new("Highlight"); h.FillColor=fill; h.OutlineColor=outline; h.Adornee=d; h.Parent=d; table.insert(worldHighlights,h)
+                    break
+                end
+            end
+        end
+    end
+end
+
+local function sectionTitle(parent,text,sub)
+    local t=Instance.new("TextLabel"); t.BackgroundTransparency=1; t.Size=UDim2.new(1,-10,0,sub and 18 or 22); t.Font=sub and Enum.Font.Gotham or Enum.Font.GothamSemibold; t.TextColor3=sub and colors.subtle or colors.text; t.TextSize=sub and 13 or 15; t.TextXAlignment=Enum.TextXAlignment.Left; t.Text=text; t.Parent=parent; return t
+end
+
+local function buildFishAutomation(parent)
+    sectionTitle(parent,"Fish It / Fisch Automation")
+    sectionTitle(parent,"Full loop: cast, hook, reel, sell, travel",true)
+
+    local fishFilter=Instance.new("TextBox"); fishFilter.Size=UDim2.new(1,-10,0,30); fishFilter.BackgroundColor3=colors.bg; fishFilter.TextColor3=colors.text; fishFilter.Text=config.esp.nameFilter~="" and config.esp.nameFilter or "fish,hotspot"; fishFilter.PlaceholderText="Tags: fish,hotspot"; fishFilter.BorderSizePixel=0; fishFilter.Font=Enum.Font.Gotham; fishFilter.TextSize=14; makeCorner(fishFilter,8); fishFilter.Parent=parent
+    fishFilter.FocusLost:Connect(function() config.esp.nameFilter=fishFilter.Text end)
+
+    makeToggle(parent,"Fishing: Auto Interact (reel)",function(on) config.autoInteractFilter="reel"; autoInteractEnabled=on; pushSessionEvent("Auto interact "..(on and "on" or "off")) end)
+    makeToggle(parent,"Fishing: ESP (fish/hotspots)",function(on)
+        if on then
+            local tags={}
+            for t in string.gmatch(string.lower(fishFilter.Text), "([^,]+)") do table.insert(tags, t:match("^%s*(.-)%s*$")) end
+            addWorldTagESP(tags, Color3.fromRGB(60,200,255), Color3.fromRGB(10,120,200))
+            pushSessionEvent("Fish ESP on")
+        else
+            clearWorldESP()
+            pushSessionEvent("Fish ESP off")
+        end
+    end)
+    addDivider(parent)
+
+    sectionTitle(parent,"Core Auto-Fishing")
+    makeToggle(parent,"Auto Cast",function(on) config.fisch.autoCast=on; pushSessionEvent("Auto Cast "..(on and "enabled" or "disabled")) end, config.fisch.autoCast)
+    makeSlider(parent,"Auto-cast delay",0,2,config.fisch.autoCastDelay or 0.6,function(v) config.fisch.autoCastDelay=v end)
+    makeToggle(parent,"Auto Reel",function(on) config.fisch.autoReel=on; pushSessionEvent("Auto Reel "..(on and "enabled" or "disabled")) end, config.fisch.autoReel)
+    makeSlider(parent,"Auto-reel delay",0,2,config.fisch.autoReelDelay or 0.4,function(v) config.fisch.autoReelDelay=v end)
+    makeToggle(parent,"Auto Mini-Game Solver",function(on) config.fisch.autoMiniGame=on; pushSessionEvent("Mini-game solver "..(on and "on" or "off")) end, config.fisch.autoMiniGame)
+    makeToggle(parent,"Perfect timing bias",function(on) config.fisch.perfectBias=on end, config.fisch.perfectBias)
+    makeToggle(parent,"Loop Auto-Fish (cast→hook→reel)",function(on) config.fisch.fullLoop=on; config.fisch.loopAutoFish=on; pushSessionEvent("Loop auto-fish "..(on and "on" or "off")) end, config.fisch.fullLoop)
+    addDivider(parent)
+
+    sectionTitle(parent,"Targeting & Modes")
+    local rarityBox=Instance.new("TextBox"); rarityBox.Size=UDim2.new(1,-10,0,30); rarityBox.BackgroundColor3=colors.bg; rarityBox.TextColor3=colors.text; rarityBox.Text=config.fisch.rarityFilter; rarityBox.PlaceholderText="Rarity filter (comma)"; rarityBox.BorderSizePixel=0; rarityBox.Font=Enum.Font.Gotham; rarityBox.TextSize=14; makeCorner(rarityBox,8); rarityBox.Parent=parent; rarityBox.FocusLost:Connect(function() config.fisch.rarityFilter=rarityBox.Text end)
+    makeSlider(parent,"Value filter (keep >= coins)",0,2000,config.fisch.valueFilter or 0,function(v) config.fisch.valueFilter=v end)
+    makeToggle(parent,"Ignore trash-tier fish",function(on) config.fisch.ignoreTrash=on end, config.fisch.ignoreTrash)
+    local whitelistBox=Instance.new("TextBox"); whitelistBox.Size=UDim2.new(1,-10,0,30); whitelistBox.BackgroundColor3=colors.bg; whitelistBox.TextColor3=colors.text; whitelistBox.Text=config.fisch.whitelist; whitelistBox.PlaceholderText="Whitelist (comma fish names)"; whitelistBox.BorderSizePixel=0; whitelistBox.Font=Enum.Font.Gotham; whitelistBox.TextSize=14; makeCorner(whitelistBox,8); whitelistBox.Parent=parent; whitelistBox.FocusLost:Connect(function() config.fisch.whitelist=whitelistBox.Text end)
+    local blacklistBox=Instance.new("TextBox"); blacklistBox.Size=UDim2.new(1,-10,0,30); blacklistBox.BackgroundColor3=colors.bg; blacklistBox.TextColor3=colors.text; blacklistBox.Text=config.fisch.blacklist; blacklistBox.PlaceholderText="Blacklist (comma junk fish)"; blacklistBox.BorderSizePixel=0; blacklistBox.Font=Enum.Font.Gotham; blacklistBox.TextSize=14; makeCorner(blacklistBox,8); blacklistBox.Parent=parent; blacklistBox.FocusLost:Connect(function() config.fisch.blacklist=blacklistBox.Text end)
+    makeDropdown(parent,"Mode",{"Balanced","XP mode","Money mode"},function(v) config.fisch.mode=v; pushSessionEvent("Mode: "..v) end, config.fisch.mode or "Balanced")
+    addDivider(parent)
+
+    sectionTitle(parent,"Hotspots & Travel")
+    makeDropdown(parent,"Teleport fishing spot",{"Ocean","River","Lake","Lava","Ice Cave","Deep Sea"},function(v) config.fisch.spotTeleport=v end, config.fisch.spotTeleport ~= "" and config.fisch.spotTeleport or "Ocean")
+    makeButton(parent,"Teleport to spot",function() pushSessionEvent("Teleport to fishing spot: "..(config.fisch.spotTeleport or "Ocean")); toast("Teleporting to "..(config.fisch.spotTeleport or "Ocean")) end)
+    makeButton(parent,"Rescan hotspots",function() pushSessionEvent("Hotspots rescanned") end)
+    local hotspotRow=Instance.new("Frame"); hotspotRow.Size=UDim2.new(1,-10,0,30); hotspotRow.BackgroundTransparency=1; hotspotRow.Parent=parent
+    local hl=Instance.new("UIListLayout",hotspotRow); hl.FillDirection=Enum.FillDirection.Horizontal; hl.Padding=UDim.new(0,6)
+    for _,label in ipairs(config.fisch.hotspotQuick) do
+        local b=Instance.new("TextButton"); b.Size=UDim2.fromOffset(90,26); b.BackgroundColor3=colors.bg; b.BorderSizePixel=0; b.TextColor3=colors.text; b.Font=Enum.Font.GothamSemibold; b.TextSize=13; b.Text=label; makeCorner(b,8); b.Parent=hotspotRow
+        b.MouseButton1Click:Connect(function() pushSessionEvent("Hop to "..label); toast("Hotspot hop: "..label) end)
+    end
+    addDivider(parent)
+
+    sectionTitle(parent,"Inventory & Selling")
+    makeToggle(parent,"Auto-sell on full inventory",function(on) config.fisch.autoSellOnFull=on end, config.fisch.autoSellOnFull)
+    makeDropdown(parent,"Keep rarity or higher",{"Common","Uncommon","Rare","Epic","Legendary","Mythical"},function(v) config.fisch.sellKeepRarity=v end, config.fisch.sellKeepRarity)
+    makeSlider(parent,"Keep if value >=",0,2000,config.fisch.sellKeepValue or 100,function(v) config.fisch.sellKeepValue=v end)
+    makeToggle(parent,"Auto-discard trash / junk",function(on) config.fisch.autoDiscardTrash=on end, config.fisch.autoDiscardTrash)
+    makeDropdown(parent,"Sort by",{"Rarity","Value","Size"},function(v) config.fisch.sortMode=v end, config.fisch.sortMode)
+    local lockBox=Instance.new("TextBox"); lockBox.Size=UDim2.new(1,-10,0,30); lockBox.BackgroundColor3=colors.bg; lockBox.TextColor3=colors.text; lockBox.Text=config.fisch.lockList or ""; lockBox.PlaceholderText="Lock list (favorites)"; lockBox.BorderSizePixel=0; lockBox.Font=Enum.Font.Gotham; lockBox.TextSize=14; makeCorner(lockBox,8); lockBox.Parent=parent; lockBox.FocusLost:Connect(function() config.fisch.lockList=lockBox.Text end)
+    addDivider(parent)
+
+    sectionTitle(parent,"Gear & Bait")
+    makeToggle(parent,"Auto-equip best rod",function(on) config.fisch.autoEquipBest=on; config.fishit.autoEquipBest=on end, config.fisch.autoEquipBest)
+    makeSlider(parent,"Auto-upgrade rod to level",0,20,config.fisch.autoUpgradeLevel or 0,function(v) config.fisch.autoUpgradeLevel=v end)
+    makeToggle(parent,"Auto-apply bait",function(on) config.fisch.autoBait=on; config.fishit.autoBait=on end, config.fisch.autoBait)
+    makeDropdown(parent,"Loadout",{"XP rod","Money rod","Boss rod"},function(v) config.fishit.loadout=v end, config.fishit.loadout)
+    addDivider(parent)
+
+    if isFishIt then
+        sectionTitle(parent,"Fish It Travel & Vendors")
+        makeDropdown(parent,"Teleport fishing biome",{"Ocean","River","Lake","Cave","Lava","Deep sea"},function(v) config.fishit.tpSpot=v end, config.fishit.tpSpot)
+        makeDropdown(parent,"Vendor teleports",{"Shop","Sell NPC","Bait Vendor","Upgrade Station"},function(v) config.fishit.tpVendor=v end, config.fishit.tpVendor)
+        makeButton(parent,"Teleport to vendor",function() pushSessionEvent("Fish It vendor TP: "..(config.fishit.tpVendor or "Shop")) end)
+        makeDropdown(parent,"Saved waypoint",{"Favorite 1","Favorite 2","Favorite 3"},function(v) config.fishit.savedWaypoint=v end, config.fishit.savedWaypoint)
+        makeToggle(parent,"Hotspot ESP",function(on) config.fishit.hotspotEsp=on end, config.fishit.hotspotEsp)
+        makeToggle(parent,"Vendor/NPC ESP",function(on) config.fishit.vendorEsp=on end, config.fishit.vendorEsp)
+        makeToggle(parent,"Pier labels",function(on) config.fishit.pierLabels=on end, config.fishit.pierLabels)
+        makeToggle(parent,"Fullbright / no fog",function(on) config.fishit.fullbright=on; config.fishit.noFog=on end, config.fishit.fullbright)
+        makeSlider(parent,"Camera FOV",60,110,config.fishit.fov,function(v) config.fishit.fov=v; camera.FieldOfView=v end)
+        makeDropdown(parent,"Overlay mode",{"Money/hour","XP/hour","Fish per minute"},function(v) config.fishit.overlayMode=v end, config.fishit.overlayMode)
+        makeToggle(parent,"Event-only fishing",function(on) config.fishit.eventOnly=on end, config.fishit.eventOnly)
+        makeToggle(parent,"Teleport to event on start",function(on) config.fishit.tpEventOnStart=on end, config.fishit.tpEventOnStart)
+        makeToggle(parent,"Anti-AFK",function(on) config.fishit.antiAfk=on end, config.fishit.antiAfk)
+        makeToggle(parent,"Rejoin low-pop server",function(on) config.fishit.rejoinLowPop=on end, config.fishit.rejoinLowPop)
+        addDivider(parent)
+    end
+
+    if isFisch then
+        sectionTitle(parent,"Fisch Regions & Routes")
+        makeDropdown(parent,"Region",{"Ocean","Moosewood","Roslit Bay","Snowcap","Sunstone","Terrapin","Mushgrove Swamp","Depths","Forsaken Shores","Ancient Isle"},function(v) config.fischPro.region=v end, config.fischPro.region)
+        makeDropdown(parent,"Route preset",{"Snowcap cave route","Ocean mythic loop","Harbor hotspots"},function(v) config.fischPro.routePreset=v end, config.fischPro.routePreset)
+        makeDropdown(parent,"Condition preset",{"Foggy night mythic","Sunny day legendary","Rainy treasure"},function(v) config.fischPro.conditionPreset=v end, config.fischPro.conditionPreset)
+        makeToggle(parent,"Auto-switch on time/weather",function(on) config.fischPro.autoSwitchTime=on; config.fischPro.autoSwitchWeather=on end, config.fischPro.autoSwitchTime)
+        makeDropdown(parent,"Mode",{"Always complete","Perfect focus","Humanized"},function(v) config.fischPro.mode=v end, config.fischPro.mode)
+        makeDropdown(parent,"Rarity target",{"Trash","Common","Uncommon","Unusual","Rare","Legendary","Mythical","Relic","Event"},function(v) config.fischPro.rarityTier=v end, config.fischPro.rarityTier)
+        makeSlider(parent,"Value filter (sell <)",0,3000,config.fischPro.autoSellValue or 500,function(v) config.fischPro.autoSellValue=v end)
+        local white=Instance.new("TextBox"); white.Size=UDim2.new(1,-10,0,30); white.BackgroundColor3=colors.bg; white.TextColor3=colors.text; white.Text=config.fischPro.whitelist; white.PlaceholderText="Whitelist (named fish)"; white.BorderSizePixel=0; white.Font=Enum.Font.Gotham; white.TextSize=14; makeCorner(white,8); white.Parent=parent; white.FocusLost:Connect(function() config.fischPro.whitelist=white.Text end)
+        local black=Instance.new("TextBox"); black.Size=UDim2.new(1,-10,0,30); black.BackgroundColor3=colors.bg; black.TextColor3=colors.text; black.Text=config.fischPro.blacklist; black.PlaceholderText="Blacklist junk"; black.BorderSizePixel=0; black.Font=Enum.Font.Gotham; black.TextSize=14; makeCorner(black,8); black.Parent=parent; black.FocusLost:Connect(function() config.fischPro.blacklist=black.Text end)
+        makeDropdown(parent,"Profile",{"XP grind","Money farm","Collection (Bestiary)"},function(v) config.fischPro.targetProfile=v end, config.fischPro.targetProfile)
+        makeDropdown(parent,"Loadout",{"Deep ocean mythic","Snowcap cave","Event fish"},function(v) config.fischPro.loadout=v end, config.fischPro.loadout)
+        makeDropdown(parent,"Bait rule",{"Don’t waste rare bait","Use best bait","Use cheap bait"},function(v) config.fischPro.baitRule=v end, config.fischPro.baitRule)
+        makeDropdown(parent,"Boat route",{"Harbor loop","Island hop","Dock > hotspot"},function(v) config.fischPro.boatRoute=v end, config.fischPro.boatRoute)
+        makeDropdown(parent,"Bestiary focus",{"Mythic","Relic","Event","Full completion"},function(v) config.fischPro.bestiaryFocus=v end, config.fischPro.bestiaryFocus)
+        makeToggle(parent,"Hotspot ESP",function(on) config.fischPro.hotspotEsp=on end, config.fischPro.hotspotEsp)
+        makeToggle(parent,"Landmark ESP",function(on) config.fischPro.landmarkEsp=on end, config.fischPro.landmarkEsp)
+        makeToggle(parent,"Mythic condition markers",function(on) config.fischPro.mythicMarker=on end, config.fischPro.mythicMarker)
+        makeToggle(parent,"Lock favorites",function(on) config.fischPro.lockFavorites=on end, config.fischPro.lockFavorites)
+        makeToggle(parent,"Profit tracking HUD",function(on) config.fischPro.profitTrack=on end, config.fischPro.profitTrack)
+        makeToggle(parent,"Alert rare events/boss windows",function(on) config.fischPro.alertEvents=on end, config.fischPro.alertEvents)
+        local bossBox=Instance.new("TextBox"); bossBox.Size=UDim2.new(1,-10,0,30); bossBox.BackgroundColor3=colors.bg; bossBox.TextColor3=colors.text; bossBox.Text=config.fischPro.bossTargets; bossBox.PlaceholderText="Boss/secret fish targets"; bossBox.BorderSizePixel=0; bossBox.Font=Enum.Font.Gotham; bossBox.TextSize=14; makeCorner(bossBox,8); bossBox.Parent=parent; bossBox.FocusLost:Connect(function() config.fischPro.bossTargets=bossBox.Text end)
+        makeDropdown(parent,"Rejoin mode",{"None","Same server","New low-pop","New high-pop"},function(v) config.fischPro.rejoinMode=v end, config.fischPro.rejoinMode)
+        makeDropdown(parent,"Overlay profile",{"Session","Coins/hour","XP/hour"},function(v) config.fischPro.overlayProfile=v end, config.fischPro.overlayProfile)
+        addDivider(parent)
+    end
+end
+
+local function buildForgePlanner(parent)
+    sectionTitle(parent,"ForgeMaster Hub")
+    sectionTitle(parent,"Plan routes, recipes, and gear without exploits",true)
+
+    sectionTitle(parent,"Mining & Ore Planning")
+    makeDropdown(parent,"Ore route",{"Goblin Caves","Volcanic Depths","Crystal Hollows"},function(v) config.forgePlanner.oreRoute=v end, config.forgePlanner.oreRoute)
+    makeSlider(parent,"Ore goal",0,5000,config.forgePlanner.oreGoal or 1000,function(v) config.forgePlanner.oreGoal=v end)
+    makeDropdown(parent,"Economy focus",{"Gold/hour","Ore/hour","Quest"},function(v) config.forgePlanner.economyMode=v end, config.forgePlanner.economyMode)
+    addDivider(parent)
+
+    sectionTitle(parent,"Forging Simulator")
+    makeDropdown(parent,"Recipe tag",{"DPS","Tank","Hybrid","Farm"},function(v) config.forgePlanner.recipeTag=v end, config.forgePlanner.recipeTag)
+    makeDropdown(parent,"Weapon profile",{"Fire greatsword","Crit dual blades","Safe tank sword"},function(v) config.forgePlanner.weaponProfile=v end, config.forgePlanner.weaponProfile)
+    makeDropdown(parent,"Armor profile",{"Goblin Cave tank set","Volcanic Depths survival","Boss fight kit"},function(v) config.forgePlanner.armorProfile=v end, config.forgePlanner.armorProfile)
+    addDivider(parent)
+
+    sectionTitle(parent,"Runes & Builds")
+    makeDropdown(parent,"Rune page",{"DPS page","Tank page","Utility/balance"},function(v) config.forgePlanner.runePage=v end, config.forgePlanner.runePage)
+    makeDropdown(parent,"Zone roadmap",{"Recommended order","Danger-first","Quest-first"},function(v) config.forgePlanner.zoneRoute=v end, config.forgePlanner.zoneRoute)
+    addDivider(parent)
+
+    sectionTitle(parent,"Session HUD")
+    makeToggle(parent,"Show overlay",function(on) config.forgePlanner.overlay=on end, config.forgePlanner.overlay)
+    makeDropdown(parent,"Theme",{"Lava","Icy","Clean","Dark"},function(v) config.forgePlanner.theme=v end, config.forgePlanner.theme)
+    addDivider(parent)
 end
 
 local function applyEspPreset(name)
@@ -777,6 +1020,15 @@ do
     makeButton(p,"Start Generic Auto-Collect",function() toast("Generic auto-collect stub"); config.autoCollect=true end)
     makeButton(p,"Stop Generic Auto-Collect",function() config.autoCollect=false end)
     addDivider(p)
+    if isFisch or isFishIt then
+        buildFishAutomation(p)
+    else
+        local note=Instance.new("TextLabel"); note.BackgroundTransparency=1; note.Size=UDim2.new(1,-10,0,36); note.Font=Enum.Font.Gotham; note.TextColor3=colors.subtle; note.TextSize=14; note.TextXAlignment=Enum.TextXAlignment.Left; note.TextWrapped=true; note.Text="Fish It automation appears here when you join Fisch/Fish It."; note.Parent=p
+    end
+    if isForge then
+        addDivider(p)
+        buildForgePlanner(p)
+    end
 end
 
 -- Player List
@@ -820,84 +1072,9 @@ do
             pushLog("Auto-exec set for "..currentGameId)
         end
     end)
-    local gameNameLower = string.lower(game.Name or "")
-    local isFisch = game.PlaceId==16732694052 or gameNameLower:find("fisch")
-    local isFishIt = gameNameLower:find("fish it") ~= nil
-    local isForge = gameNameLower:find("forge") ~= nil
-    -- per-game modules with tag filters
-    local function addWorldTagESP(tagList, fill, outline)
-        clearWorldESP()
-        worldEspState = {tags=tagList, fill=fill, outline=outline}
-        for _,d in ipairs(workspace:GetDescendants()) do
-            if d:IsA("BasePart") then
-                for _,tag in ipairs(tagList) do
-                    if d.Name:lower():find(tag) then
-                        local h=Instance.new("Highlight"); h.FillColor=fill; h.OutlineColor=outline; h.Adornee=d; h.Parent=d; table.insert(worldHighlights,h)
-                        break
-                    end
-                end
-            end
-        end
-    end
-
     if isFisch or isFishIt then
-        local fishFilter=Instance.new("TextBox"); fishFilter.Size=UDim2.new(1,-10,0,30); fishFilter.BackgroundColor3=colors.bg; fishFilter.TextColor3=colors.text; fishFilter.Text="fish,hotspot"; fishFilter.PlaceholderText="Tags: fish,hotspot"; fishFilter.BorderSizePixel=0; fishFilter.Font=Enum.Font.Gotham; fishFilter.TextSize=14; makeCorner(fishFilter,8); fishFilter.Parent=p
-        makeToggle(p,"Fishing: Auto Interact (reel)",function(on) config.autoInteractFilter="reel"; autoInteractEnabled=on; pushSessionEvent("Auto interact "..(on and "on" or "off")) end)
-        makeToggle(p,"Fishing: ESP (fish/hotspots)",function(on)
-            if on then
-                local tags={}
-                for t in string.gmatch(string.lower(fishFilter.Text), "([^,]+)") do table.insert(tags, t:match("^%s*(.-)%s*$")) end
-                addWorldTagESP(tags, Color3.fromRGB(60,200,255), Color3.fromRGB(10,120,200))
-                pushSessionEvent("Fish ESP on")
-            else
-                clearWorldESP()
-                pushSessionEvent("Fish ESP off")
-            end
-        end)
-        addDivider(p)
-        makeToggle(p,"Auto Cast",function(on) config.fisch.autoCast=on; pushSessionEvent("Auto Cast "..(on and "enabled" or "disabled")) end, config.fisch.autoCast)
-        makeSlider(p,"Auto-cast delay",0,2,config.fisch.autoCastDelay or 0.6,function(v) config.fisch.autoCastDelay=v end)
-        makeToggle(p,"Auto Reel",function(on) config.fisch.autoReel=on; pushSessionEvent("Auto Reel "..(on and "enabled" or "disabled")) end, config.fisch.autoReel)
-        makeSlider(p,"Auto-reel delay",0,2,config.fisch.autoReelDelay or 0.4,function(v) config.fisch.autoReelDelay=v end)
-        makeToggle(p,"Auto Mini-Game Solver",function(on) config.fisch.autoMiniGame=on; pushSessionEvent("Mini-game solver "..(on and "on" or "off")) end, config.fisch.autoMiniGame)
-        makeToggle(p,"Perfect only mode",function(on) config.fisch.perfectOnly=on end, config.fisch.perfectOnly)
-        makeToggle(p,"Loop Auto-Fish (cast→hook→reel)",function(on) config.fisch.loopAutoFish=on; pushSessionEvent("Loop auto-fish "..(on and "on" or "off")) end, config.fisch.loopAutoFish)
-        addDivider(p)
-        local rarityBox=Instance.new("TextBox"); rarityBox.Size=UDim2.new(1,-10,0,30); rarityBox.BackgroundColor3=colors.bg; rarityBox.TextColor3=colors.text; rarityBox.Text=config.fisch.rarityFilter; rarityBox.PlaceholderText="Rarity filter (comma)"; rarityBox.BorderSizePixel=0; rarityBox.Font=Enum.Font.Gotham; rarityBox.TextSize=14; makeCorner(rarityBox,8); rarityBox.Parent=p; rarityBox.FocusLost:Connect(function() config.fisch.rarityFilter=rarityBox.Text end)
-        makeSlider(p,"Value filter (keep >= coins)",0,1000,config.fisch.valueFilter or 0,function(v) config.fisch.valueFilter=v end)
-        makeToggle(p,"Ignore trash-tier fish",function(on) config.fisch.ignoreTrash=on end, config.fisch.ignoreTrash)
-        local whitelistBox=Instance.new("TextBox"); whitelistBox.Size=UDim2.new(1,-10,0,30); whitelistBox.BackgroundColor3=colors.bg; whitelistBox.TextColor3=colors.text; whitelistBox.Text=config.fisch.whitelist; whitelistBox.PlaceholderText="Whitelist (comma fish names)"; whitelistBox.BorderSizePixel=0; whitelistBox.Font=Enum.Font.Gotham; whitelistBox.TextSize=14; makeCorner(whitelistBox,8); whitelistBox.Parent=p; whitelistBox.FocusLost:Connect(function() config.fisch.whitelist=whitelistBox.Text end)
-        local blacklistBox=Instance.new("TextBox"); blacklistBox.Size=UDim2.new(1,-10,0,30); blacklistBox.BackgroundColor3=colors.bg; blacklistBox.TextColor3=colors.text; blacklistBox.Text=config.fisch.blacklist; blacklistBox.PlaceholderText="Blacklist (comma junk fish)"; blacklistBox.BorderSizePixel=0; blacklistBox.Font=Enum.Font.Gotham; blacklistBox.TextSize=14; makeCorner(blacklistBox,8); blacklistBox.Parent=p; blacklistBox.FocusLost:Connect(function() config.fisch.blacklist=blacklistBox.Text end)
-        makeDropdown(p,"Focus mode",{"Balanced","Max XP/hour","Max Coins/hour"},function(v) config.fisch.focusMode=v; pushSessionEvent("Focus: "..v) end, config.fisch.focusMode)
-        addDivider(p)
-        makeDropdown(p,"Teleport fishing spot",{"Ocean","River","Lake","Lava","Ice Cave","Deep Sea"},function(v) config.fisch.spotTeleport=v end, config.fisch.spotTeleport ~= "" and config.fisch.spotTeleport or "Ocean")
-        makeButton(p,"Teleport to spot",function() pushSessionEvent("Teleport to fishing spot: "..(config.fisch.spotTeleport or "Ocean")); toast("Teleporting to "..(config.fisch.spotTeleport or "Ocean")) end)
-        makeButton(p,"Rescan hotspots",function() pushSessionEvent("Hotspots rescanned") end)
-        local hotspotRow=Instance.new("Frame"); hotspotRow.Size=UDim2.new(1,-10,0,30); hotspotRow.BackgroundTransparency=1; hotspotRow.Parent=p
-        local hl=Instance.new("UIListLayout",hotspotRow); hl.FillDirection=Enum.FillDirection.Horizontal; hl.Padding=UDim.new(0,6)
-        for i,label in ipairs(config.fisch.hotspotQuick) do
-            local b=Instance.new("TextButton"); b.Size=UDim2.fromOffset(90,26); b.BackgroundColor3=colors.bg; b.BorderSizePixel=0; b.TextColor3=colors.text; b.Font=Enum.Font.GothamSemibold; b.TextSize=13; b.Text=label; makeCorner(b,8); b.Parent=hotspotRow
-            b.MouseButton1Click:Connect(function() pushSessionEvent("Hop to "..label); toast("Hotspot hop: "..label) end)
-        end
-        addDivider(p)
-        makeToggle(p,"Auto-sell when full",function(on) config.fisch.autoSellOnFull=on end, config.fisch.autoSellOnFull)
-        makeSlider(p,"Auto-sell value >=",0,500,config.fisch.autoSellThreshold or 0,function(v) config.fisch.autoSellThreshold=v end)
-        makeDropdown(p,"Keep rarity or above",{"Common","Uncommon","Rare","Epic","Legendary","Mythical"},function(v) config.fisch.sellKeepRarity=v end, config.fisch.sellKeepRarity)
-        makeSlider(p,"Keep value >=",0,1000,config.fisch.sellKeepValue or 0,function(v) config.fisch.sellKeepValue=v end)
-        makeToggle(p,"Auto-discard trash",function(on) config.fisch.autoDiscardTrash=on end, config.fisch.autoDiscardTrash)
-        makeDropdown(p,"Sort mode",{"Rarity","Value","Size"},function(v) config.fisch.sortMode=v end, config.fisch.sortMode)
-        local lockBox=Instance.new("TextBox"); lockBox.Size=UDim2.new(1,-10,0,30); lockBox.BackgroundColor3=colors.bg; lockBox.TextColor3=colors.text; lockBox.Text=config.fisch.lockList; lockBox.PlaceholderText="Locked fish (never sell)"; lockBox.BorderSizePixel=0; lockBox.Font=Enum.Font.Gotham; lockBox.TextSize=14; makeCorner(lockBox,8); lockBox.Parent=p; lockBox.FocusLost:Connect(function() config.fisch.lockList=lockBox.Text end)
-        addDivider(p)
-        makeToggle(p,"Auto-equip best rod",function(on) config.fisch.autoEquipBest=on end, config.fisch.autoEquipBest)
-        makeSlider(p,"Auto-upgrade rod to lvl",0,10,config.fisch.autoUpgradeLevel or 0,function(v) config.fisch.autoUpgradeLevel=v end)
-        makeToggle(p,"Auto-bait (keep active)",function(on) config.fisch.autoBait=on end, config.fisch.autoBait)
-        makeDropdown(p,"Loadout presets",{"XP Rod Setup","Money Rod Setup","Event Setup"},function(v) config.fisch.activeLoadout=v; pushSessionEvent("Loadout: "..v) end)
-        addDivider(p)
-        makeDropdown(p,"Depth preference",{"Any","Shallow","Deep","Special"},function(v) config.fisch.depthPreference=v end, config.fisch.depthPreference)
-        makeToggle(p,"Boat assist (dock & teleport)",function(on) config.fisch.boatAssist=on end, config.fisch.boatAssist)
-        makeToggle(p,"Fish HUD overlay",function(on) config.fisch.fishHud=on end, config.fisch.fishHud)
-        makeToggle(p,"Anti-AFK for fishing",function(on) config.fisch.antiAfk=on end, config.fisch.antiAfk)
-        makeToggle(p,"Event alerts",function(on) config.fisch.eventNotify=on end, config.fisch.eventNotify)
+        local fishNote=Instance.new("TextLabel"); fishNote.BackgroundTransparency=1; fishNote.Size=UDim2.new(1,-10,0,40); fishNote.Font=Enum.Font.Gotham; fishNote.TextColor3=colors.text; fishNote.TextSize=14; fishNote.TextWrapped=true; fishNote.TextXAlignment=Enum.TextXAlignment.Left; fishNote.TextYAlignment=Enum.TextYAlignment.Top; fishNote.Text="Fish It controls moved to Automation tab for a full-page layout."; fishNote.Parent=p
+        makeButton(p,"Open Fish Automation",function() switchTab("Automation") end)
     end
     if isForge then
         local forgeFilter=Instance.new("TextBox"); forgeFilter.Size=UDim2.new(1,-10,0,30); forgeFilter.BackgroundColor3=colors.bg; forgeFilter.TextColor3=colors.text; forgeFilter.Text="ore,anvil,forge,smelt"; forgeFilter.PlaceholderText="Tags: ore,anvil,forge"; forgeFilter.BorderSizePixel=0; forgeFilter.Font=Enum.Font.Gotham; forgeFilter.TextSize=14; makeCorner(forgeFilter,8); forgeFilter.Parent=p
@@ -1286,6 +1463,17 @@ task.spawn(function()
             end
         end
         task.wait(0.5)
+    end
+end)
+
+task.spawn(function()
+    while true do
+        if worldEspState.tags and config.worldScanInterval and config.worldScanInterval > 0 then
+            addWorldTagESP(worldEspState.tags, worldEspState.fill or colors.accent, worldEspState.outline or colors.accent2)
+            task.wait(config.worldScanInterval)
+        else
+            task.wait(1)
+        end
     end
 end)
 
