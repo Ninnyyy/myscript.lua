@@ -75,7 +75,7 @@ local config = {
     },
     autoDisableOnTP = false,
     stopOnPanic = true,
-    uiBlur = false,
+    uiBlur = true,
     blurSize = 8,
     uiOpacity = 1,
     menuW = 640,
@@ -422,15 +422,15 @@ end
 -- UI builders
 local function makeToggle(parent,label,cb,defaultState)
     local h = config.compact and 34 or 40
-    local f=Instance.new("Frame"); f.Size=UDim2.new(1,-10,0,h); f.BackgroundColor3=colors.panel; f.BorderSizePixel=0; makeCorner(f,10); f.Parent=parent
+    local f=Instance.new("Frame"); f.Size=UDim2.new(1,-10,0,h); f.BackgroundColor3=colors.panel:lerp(Color3.new(1,1,1),0.05); f.BackgroundTransparency=0.08; f.BorderSizePixel=0; makeCorner(f,12); f.Parent=parent
     local l=Instance.new("TextLabel"); l.BackgroundTransparency=1; l.Size=UDim2.new(1,-90,1,0); l.Position=UDim2.new(0,12,0,0); l.Font=Enum.Font.Gotham; l.TextColor3=colors.text; l.TextSize=15; l.TextXAlignment=Enum.TextXAlignment.Left; l.Text=label; l.Parent=f
-    local btn=Instance.new("TextButton"); btn.Size=UDim2.fromOffset(70,config.compact and 22 or 24); btn.Position=UDim2.new(1,-80,0.5,-(config.compact and 11 or 12)); btn.BackgroundColor3=colors.bg; btn.BorderSizePixel=0; btn.AutoButtonColor=false; btn.Text="Off"; btn.TextColor3=colors.text; btn.Font=Enum.Font.GothamSemibold; btn.TextSize=13; makeCorner(btn,12); btn.Parent=f
+    local btn=Instance.new("TextButton"); btn.Size=UDim2.fromOffset(70,config.compact and 22 or 24); btn.Position=UDim2.new(1,-80,0.5,-(config.compact and 11 or 12)); btn.BackgroundColor3=colors.bg:lerp(colors.accent,0.06); btn.BackgroundTransparency=0.12; btn.BorderSizePixel=0; btn.AutoButtonColor=false; btn.Text="Off"; btn.TextColor3=colors.text; btn.Font=Enum.Font.GothamSemibold; btn.TextSize=13; makeCorner(btn,12); btn.Parent=f
     local knob=Instance.new("Frame"); knob.Size=UDim2.fromOffset(20,20); knob.Position=UDim2.new(0,2,0.5,-10); knob.BackgroundColor3=colors.subtle; knob.BorderSizePixel=0; makeCorner(knob,20); knob.Parent=btn
     local on=defaultState or false
     local function set(state)
         on=state
         btn.Text = on and "On" or "Off"
-        tween(btn,0.16,{BackgroundColor3=on and colors.accent or colors.bg})
+        tween(btn,0.16,{BackgroundColor3=on and colors.accent or colors.bg:lerp(colors.accent2,0.06)})
         tween(knob,0.16,{Position=on and UDim2.new(1,-22,0.5,-10) or UDim2.new(0,2,0.5,-10), BackgroundColor3=on and Color3.new(1,1,1) or colors.subtle})
         pushLog(string.format("%s: %s", label, on and "On" or "Off"))
         if cb then task.spawn(function() cb(on) end) end
@@ -440,20 +440,20 @@ local function makeToggle(parent,label,cb,defaultState)
 end
 
 local function makeButton(parent,label,cb)
-    local b=Instance.new("TextButton"); b.Size=UDim2.new(1,-10,0,40); b.BackgroundColor3=colors.panel; b.BorderSizePixel=0; b.AutoButtonColor=false
+    local b=Instance.new("TextButton"); b.Size=UDim2.new(1,-10,0,40); b.BackgroundColor3=colors.panel:lerp(Color3.new(1,1,1),0.05); b.BackgroundTransparency=0.08; b.BorderSizePixel=0; b.AutoButtonColor=false
     b.Font=Enum.Font.GothamSemibold; b.TextColor3=colors.text; b.TextSize=15; b.Text=label; makeCorner(b,10); b.Parent=parent
-    b.MouseEnter:Connect(function() tween(b,0.08,{BackgroundColor3=colors.accent2}) end)
-    b.MouseLeave:Connect(function() tween(b,0.08,{BackgroundColor3=colors.panel}) end)
+    b.MouseEnter:Connect(function() tween(b,0.08,{BackgroundColor3=colors.accent2, BackgroundTransparency=0}) end)
+    b.MouseLeave:Connect(function() tween(b,0.08,{BackgroundColor3=colors.panel:lerp(Color3.new(1,1,1),0.05), BackgroundTransparency=0.08}) end)
     b.MouseButton1Click:Connect(function() ripple(b); if cb then task.spawn(cb) end end)
     return b
 end
 
 local function makeSlider(parent,label,min,max,default,cb)
     local h = config.compact and 38 or 44
-    local f=Instance.new("Frame"); f.Size=UDim2.new(1,-10,0,h); f.BackgroundColor3=colors.panel; f.BorderSizePixel=0; makeCorner(f,10); f.Parent=parent
+    local f=Instance.new("Frame"); f.Size=UDim2.new(1,-10,0,h); f.BackgroundColor3=colors.panel:lerp(Color3.new(1,1,1),0.05); f.BackgroundTransparency=0.08; f.BorderSizePixel=0; makeCorner(f,12); f.Parent=parent
     local l=Instance.new("TextLabel"); l.BackgroundTransparency=1; l.Size=UDim2.new(0.5,-10,1,0); l.Position=UDim2.new(0,12,0,0); l.Font=Enum.Font.Gotham; l.TextColor3=colors.text; l.TextSize=14; l.TextXAlignment=Enum.TextXAlignment.Left; l.Text=label; l.Parent=f
     local value=Instance.new("TextLabel"); value.BackgroundTransparency=1; value.Size=UDim2.new(0.5,-10,1,0); value.Position=UDim2.new(0.5,0,0,0); value.Font=Enum.Font.GothamSemibold; value.TextColor3=colors.text; value.TextSize=14; value.TextXAlignment=Enum.TextXAlignment.Right; value.Text=tostring(default); value.Parent=f
-    local bar=Instance.new("Frame"); bar.Size=UDim2.new(1,-24,0,6); bar.Position=UDim2.new(0,12,1,-12); bar.BackgroundColor3=colors.bg; bar.BorderSizePixel=0; makeCorner(bar,6); bar.Parent=f
+    local bar=Instance.new("Frame"); bar.Size=UDim2.new(1,-24,0,6); bar.Position=UDim2.new(0,12,1,-12); bar.BackgroundColor3=colors.bg:lerp(colors.accent2,0.05); bar.BackgroundTransparency=0.18; bar.BorderSizePixel=0; makeCorner(bar,6); bar.Parent=f
     local fill=Instance.new("Frame"); fill.Size=UDim2.new((default-min)/(max-min),0,1,0); fill.BackgroundColor3=colors.accent; fill.BorderSizePixel=0; makeCorner(fill,6); fill.Parent=bar
     local dragging=false
     local function setVal(v)
@@ -466,9 +466,9 @@ local function makeSlider(parent,label,min,max,default,cb)
 end
 
 local function makeDropdown(parent,label,options,cb,defaultVal)
-    local f=Instance.new("Frame"); f.Size=UDim2.new(1,-10,0,40); f.BackgroundColor3=colors.panel; f.BorderSizePixel=0; makeCorner(f,10); f.Parent=parent
+    local f=Instance.new("Frame"); f.Size=UDim2.new(1,-10,0,40); f.BackgroundColor3=colors.panel:lerp(Color3.new(1,1,1),0.05); f.BackgroundTransparency=0.08; f.BorderSizePixel=0; makeCorner(f,12); f.Parent=parent
     local l=Instance.new("TextLabel"); l.BackgroundTransparency=1; l.Size=UDim2.new(0.5,-10,1,0); l.Position=UDim2.new(0,12,0,0); l.Font=Enum.Font.Gotham; l.TextColor3=colors.text; l.TextSize=15; l.TextXAlignment=Enum.TextXAlignment.Left; l.Text=label; l.Parent=f
-    local btn=Instance.new("TextButton"); btn.Size=UDim2.new(0.5,-20,1,-8); btn.Position=UDim2.new(0.5,8,0,4); btn.BackgroundColor3=colors.bg; btn.BorderSizePixel=0; btn.TextColor3=colors.text; btn.Font=Enum.Font.GothamSemibold; btn.TextSize=14; btn.Text=options[1] or "Select"; makeCorner(btn,8); btn.Parent=f
+    local btn=Instance.new("TextButton"); btn.Size=UDim2.new(0.5,-20,1,-8); btn.Position=UDim2.new(0.5,8,0,4); btn.BackgroundColor3=colors.bg:lerp(colors.accent2,0.08); btn.BackgroundTransparency=0.1; btn.BorderSizePixel=0; btn.TextColor3=colors.text; btn.Font=Enum.Font.GothamSemibold; btn.TextSize=14; btn.Text=options[1] or "Select"; makeCorner(btn,8); btn.Parent=f
     local function set(val) btn.Text=val; if cb then cb(val) end end
     btn.MouseButton1Click:Connect(function() ripple(btn); local next=1; for i,opt in ipairs(options) do if opt==btn.Text then next=i%#options+1 end end; set(options[next]) end)
     set(defaultVal or options[1]); return set
@@ -703,8 +703,29 @@ Players.PlayerAdded:Connect(function(p) p.CharacterAdded:Connect(function() if c
 
 -- GUI root
 local gui = Instance.new("ScreenGui"); gui.Name="AdvancedMenu"; gui.ResetOnSpawn=false; gui.Parent=game:GetService("CoreGui")
+
+-- Christmas glass backdrop
+setBlur(config.uiBlur ~= false, config.blurSize or 10)
+local backdrop = Instance.new("Frame"); backdrop.Size=UDim2.new(1,0,1,0); backdrop.Position=UDim2.new(0,0,0,0); backdrop.BackgroundColor3=colors.bg; backdrop.BackgroundTransparency=0.2; backdrop.BorderSizePixel=0; backdrop.ZIndex=0; backdrop.Parent=gui
+local bgGrad = Instance.new("UIGradient", backdrop); bgGrad.Rotation=35; bgGrad.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(255,120,120)),
+    ColorSequenceKeypoint.new(0.48, Color3.fromRGB(40,26,22)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(46,96,64)),
+})
+local vignette = Instance.new("Frame"); vignette.Size=UDim2.new(1,0,1,0); vignette.BackgroundColor3=Color3.new(0,0,0); vignette.BackgroundTransparency=0.65; vignette.BorderSizePixel=0; vignette.ZIndex=0; vignette.Parent=gui
+local vigGrad = Instance.new("UIGradient", vignette); vigGrad.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(0,0,0)),
+    ColorSequenceKeypoint.new(0.4, Color3.fromRGB(40,40,40)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(0,0,0)),
+}); vigGrad.Transparency = NumberSequence.new({
+    NumberSequenceKeypoint.new(0,0.32),
+    NumberSequenceKeypoint.new(0.35,0.55),
+    NumberSequenceKeypoint.new(1,0.24),
+})
+
 local mainWidth, mainHeight = config.menuW or 640, config.menuH or 480
-local main = Instance.new("Frame"); main.Size=UDim2.fromOffset(mainWidth, mainHeight); main.Position=UDim2.new(0.5,-mainWidth/2,0.5,-mainHeight/2); main.BackgroundColor3=colors.bg; main.BorderSizePixel=0; main.Active=true; main.Draggable=true; main.Parent=gui; makeCorner(main,12)
+local main = Instance.new("Frame"); main.Size=UDim2.fromOffset(mainWidth, mainHeight); main.Position=UDim2.new(0.5,-mainWidth/2,0.5,-mainHeight/2); main.BackgroundColor3=colors.bg:lerp(Color3.new(1,1,1),0.04); main.BackgroundTransparency=0.12; main.BorderSizePixel=0; main.Active=true; main.Draggable=true; main.Parent=gui; makeCorner(main,16)
+local glassStroke = Instance.new("UIStroke", main); glassStroke.Thickness = 1.4; glassStroke.Transparency = 0.35; glassStroke.Color = colors.accent; local glassGrad = Instance.new("UIGradient", glassStroke); glassGrad.Color = ColorSequence.new({ColorSequenceKeypoint.new(0, colors.accent2), ColorSequenceKeypoint.new(1, colors.accent)})
 local function setMainSize(w,h)
     mainWidth, mainHeight = w,h
     config.menuW, config.menuH = w,h
@@ -723,8 +744,8 @@ end)
 
 -- Title
 local titleHeight = 48
-local title=Instance.new("Frame"); title.Size=UDim2.new(1,0,0,titleHeight); title.BackgroundColor3=colors.panel:lerp(Color3.new(0,0,0),0.16); title.BorderSizePixel=0; title.Parent=main; makeCorner(title,12)
-local titleLabel=Instance.new("TextLabel"); titleLabel.Size=UDim2.new(1,-170,1,0); titleLabel.Position=UDim2.new(0,18,0,6); titleLabel.BackgroundTransparency=1; titleLabel.Font=Enum.Font.GothamBold; titleLabel.Text="Ninnydll"; titleLabel.TextColor3=Color3.fromRGB(255,215,120); titleLabel.TextSize=18; titleLabel.TextXAlignment=Enum.TextXAlignment.Left; titleLabel.Parent=title
+local title=Instance.new("Frame"); title.Size=UDim2.new(1,0,0,titleHeight); title.BackgroundColor3=colors.panel:lerp(colors.accent,0.08); title.BorderSizePixel=0; title.Parent=main; makeCorner(title,12)
+local titleLabel=Instance.new("TextLabel"); titleLabel.Size=UDim2.new(1,-170,1,0); titleLabel.Position=UDim2.new(0,18,0,6); titleLabel.BackgroundTransparency=1; titleLabel.Font=Enum.Font.GothamBold; titleLabel.Text="Ninnydll Premium 🎄"; titleLabel.TextColor3=Color3.fromRGB(255,215,120); titleLabel.TextSize=18; titleLabel.TextXAlignment=Enum.TextXAlignment.Left; titleLabel.Parent=title
 task.spawn(function()
     local gold1 = Color3.fromRGB(255,215,120)
     local gold2 = Color3.fromRGB(255,235,170)
@@ -746,11 +767,11 @@ local function pushSessionEvent(msg)
     while #sessionEvents > 6 do table.remove(sessionEvents) end
     if updateTimeline then updateTimeline() end
 end
-local underline=Instance.new("Frame"); underline.Size=UDim2.new(1,-16,0,1); underline.Position=UDim2.new(0,8,1,-1); underline.BackgroundColor3=colors.accent; underline.BorderSizePixel=0; underline.Parent=title
+local underline=Instance.new("Frame"); underline.Size=UDim2.new(1,-16,0,1); underline.Position=UDim2.new(0,8,1,-1); underline.BackgroundColor3=colors.accent; underline.BorderSizePixel=0; underline.Parent=title; local underlineGrad=Instance.new("UIGradient", underline); underlineGrad.Color = ColorSequence.new({ColorSequenceKeypoint.new(0, colors.accent2), ColorSequenceKeypoint.new(1, colors.accent)})
 
 -- Status bar
 local statusHeight = 26
-local statusBar=Instance.new("Frame"); statusBar.Size=UDim2.new(1,-14,0,statusHeight); statusBar.Position=UDim2.new(0,7,0,titleHeight); statusBar.BackgroundColor3=colors.panel:lerp(colors.bg,0.4); statusBar.BorderSizePixel=0; statusBar.Parent=main; makeCorner(statusBar,10)
+local statusBar=Instance.new("Frame"); statusBar.Size=UDim2.new(1,-14,0,statusHeight); statusBar.Position=UDim2.new(0,7,0,titleHeight); statusBar.BackgroundColor3=colors.panel:lerp(colors.accent2,0.1); statusBar.BackgroundTransparency=0.12; statusBar.BorderSizePixel=0; statusBar.Parent=main; makeCorner(statusBar,10); local statusGrad=Instance.new("UIGradient", statusBar); statusGrad.Color = ColorSequence.new({ColorSequenceKeypoint.new(0, colors.panel), ColorSequenceKeypoint.new(1, colors.panel:lerp(colors.accent2,0.2))})
 local statusLabel=Instance.new("TextLabel"); statusLabel.BackgroundTransparency=1; statusLabel.Size=UDim2.new(1,-20,1,0); statusLabel.Position=UDim2.new(0,10,0,0); statusLabel.Font=Enum.Font.GothamSemibold; statusLabel.TextColor3=colors.subtle; statusLabel.TextSize=13; statusLabel.TextXAlignment=Enum.TextXAlignment.Left; statusLabel.Parent=statusBar
 local contentTop = titleHeight + statusHeight + 12
 
@@ -760,12 +781,14 @@ local qaList=Instance.new("UIListLayout",quick); qaList.Padding=UDim.new(0,8); q
 local quickPad=Instance.new("UIPadding", quick); quickPad.PaddingLeft=UDim.new(0,12); quickPad.PaddingRight=UDim.new(0,12)
 local function pill(label,color,cb) local b=Instance.new("TextButton"); b.Size=UDim2.fromOffset(120,28); b.BackgroundColor3=color; b.BorderSizePixel=0; b.TextColor3=Color3.new(1,1,1); b.TextSize=13; b.Font=Enum.Font.GothamSemibold; b.Text=label; b.AutoButtonColor=false; makeCorner(b,14); b.Parent=quick; b.MouseButton1Click:Connect(function() ripple(b); if cb then cb() end end) end
 pill("Panic",colors.danger,function() clearESP(); gui:Destroy(); offscreenGui:Destroy(); setBlur(false); Hum.WalkSpeed=wsDefault; Hum.JumpPower=jpDefault; workspace.Gravity=gravityDefault end)
-pill("Hide UI",colors.accent2,function() hidden=not hidden; main.Visible=not hidden; offscreenGui.Enabled=not hidden end)
+pill("Hide UI",colors.accent2,function() hidden=not hidden; main.Visible=not hidden; offscreenGui.Enabled=not hidden; setBlur(not hidden and config.uiBlur ~= false, config.blurSize or 10) end)
 pill("Rejoin",colors.accent,function() TeleportService:Teleport(game.PlaceId,LP) end)
 pill("Soft Panic",colors.warn,softPanic)
 
 -- Tabs & pages
-local tabs=Instance.new("Frame"); tabs.Size=UDim2.new(0,175,1,-contentTop-10); tabs.Position=UDim2.new(0,0,0,contentTop); tabs.BackgroundColor3=colors.panel; tabs.BorderSizePixel=0; tabs.Parent=main; makeCorner(tabs,12)
+local tabs=Instance.new("Frame"); tabs.Size=UDim2.new(0,175,1,-contentTop-10); tabs.Position=UDim2.new(0,0,0,contentTop); tabs.BackgroundColor3=colors.panel:lerp(Color3.new(1,1,1),0.06); tabs.BackgroundTransparency=0.18; tabs.BorderSizePixel=0; tabs.Parent=main; makeCorner(tabs,14)
+local tabsStroke = Instance.new("UIStroke", tabs); tabsStroke.Thickness=1; tabsStroke.Transparency=0.55; tabsStroke.Color=colors.accent2
+local tabsGrad=Instance.new("UIGradient", tabs); tabsGrad.Rotation=90; tabsGrad.Color = ColorSequence.new({ColorSequenceKeypoint.new(0, colors.panel), ColorSequenceKeypoint.new(1, colors.bg:lerp(colors.accent2,0.06))})
 local tabsPad = Instance.new("UIPadding", tabs); tabsPad.PaddingLeft = UDim.new(0,8); tabsPad.PaddingRight = UDim.new(0,8); tabsPad.PaddingTop = UDim.new(0,10)
 local tabList=Instance.new("UIListLayout",tabs); tabList.VerticalAlignment=Enum.VerticalAlignment.Top; tabList.HorizontalAlignment=Enum.HorizontalAlignment.Center; tabList.Padding=UDim.new(0, config.compact and 6 or 8)
 local tabNames={"Dashboard","Movement","Visuals","Combat","Automation","Player List","Script Hub","Configs","Protection","UI / Theme"}
@@ -774,7 +797,8 @@ local tabIcons={
 }
 local pages={}
 local selectedTab
-local pageHolder=Instance.new("Frame"); pageHolder.Size=UDim2.new(1,-185,1,-contentTop-10); pageHolder.Position=UDim2.new(0,185,0,contentTop); pageHolder.BackgroundColor3=colors.panel:lerp(colors.bg,0.35); pageHolder.BorderSizePixel=0; pageHolder.Parent=main; makeCorner(pageHolder,14)
+local pageHolder=Instance.new("Frame"); pageHolder.Size=UDim2.new(1,-185,1,-contentTop-10); pageHolder.Position=UDim2.new(0,185,0,contentTop); pageHolder.BackgroundColor3=colors.panel:lerp(Color3.new(1,1,1),0.08); pageHolder.BackgroundTransparency=0.06; pageHolder.BorderSizePixel=0; pageHolder.Parent=main; makeCorner(pageHolder,16)
+local pageStroke = Instance.new("UIStroke", pageHolder); pageStroke.Thickness=1; pageStroke.Transparency=0.65; pageStroke.Color=colors.subtle
 local pagePadding=Instance.new("UIPadding",pageHolder); pagePadding.PaddingTop=UDim.new(0,8); pagePadding.PaddingBottom=UDim.new(0,8); pagePadding.PaddingLeft=UDim.new(0,10); pagePadding.PaddingRight=UDim.new(0,10)
 for _,name in ipairs(tabNames) do
     local page=Instance.new("ScrollingFrame"); page.Size=UDim2.new(1,0,1,0); page.Position=UDim2.new(0,0,0,0); page.BackgroundTransparency=1; page.Visible=false; page.ScrollBarThickness=6; page.VerticalScrollBarInset=Enum.ScrollBarInset.ScrollBar; page.CanvasSize=UDim2.new(0,0,0,0); page.Parent=pageHolder
@@ -802,9 +826,10 @@ local function switchTab(name)
     selectedTab=name
 end
 local function createTabButton(name)
-    local b=Instance.new("TextButton"); b.Size=UDim2.new(1,-24,0,38); b.BackgroundColor3=colors.bg; b.BorderSizePixel=0; b.AutoButtonColor=false; b.Font=Enum.Font.GothamSemibold; b.TextColor3=colors.text; b.TextSize=15; b.Text=((tabIcons[name] or "").."  "..name); b:SetAttribute("BG",true); makeCorner(b,10); b.Parent=tabs
-    b.MouseEnter:Connect(function() tween(b,0.12,{BackgroundColor3=colors.panel}) end)
-    b.MouseLeave:Connect(function() if selectedTab~=name then tween(b,0.12,{BackgroundColor3=colors.bg}) end end)
+    local b=Instance.new("TextButton"); b.Size=UDim2.new(1,-24,0,38); b.BackgroundColor3=colors.bg:lerp(Color3.new(1,1,1),0.06); b.BackgroundTransparency=0.1; b.BorderSizePixel=0; b.AutoButtonColor=false; b.Font=Enum.Font.GothamSemibold; b.TextColor3=colors.text; b.TextSize=15; b.Text=((tabIcons[name] or "").."  "..name); b:SetAttribute("BG",true); makeCorner(b,10); b.Parent=tabs
+    local tabStroke=Instance.new("UIStroke", b); tabStroke.Thickness=1; tabStroke.Transparency=0.7; tabStroke.Color=colors.subtle
+    b.MouseEnter:Connect(function() tween(b,0.12,{BackgroundColor3=colors.panel:lerp(colors.accent2,0.08)}) end)
+    b.MouseLeave:Connect(function() if selectedTab~=name then tween(b,0.12,{BackgroundColor3=colors.bg:lerp(Color3.new(1,1,1),0.06)}) end end)
     b.MouseButton1Click:Connect(function()
         ripple(b); switchTab(name)
         for other,btn in pairs(tabButtons) do tween(btn,0.2,{BackgroundColor3=(other==name) and (tabColors[name] or colors.accent) or colors.bg}) end
@@ -1490,6 +1515,17 @@ end)
 
 task.spawn(function()
     while true do
+        if worldEspState.tags and config.worldScanInterval and config.worldScanInterval > 0 then
+            addWorldTagESP(worldEspState.tags, worldEspState.fill or colors.accent, worldEspState.outline or colors.accent2)
+            task.wait(config.worldScanInterval)
+        else
+            task.wait(1)
+        end
+    end
+end)
+
+task.spawn(function()
+    while true do
         if config.antiAfk then VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Right, false, nil); VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Right, false, nil) end
         task.wait(30)
     end
@@ -1531,7 +1567,7 @@ LP.CharacterAdded:Connect(function(newChar)
 end)
 
 applyTheme()
-setBlur(config.uiBlur)
+setBlur(config.uiBlur, config.blurSize or 10)
 applyOpacity(main)
 autoLoadConfig()
 if config.disableInVIP and (game.PrivateServerId and game.PrivateServerId ~= "") then
