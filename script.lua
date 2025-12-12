@@ -81,6 +81,7 @@ local config = {
     menuW = 640,
     menuH = 480,
     compact = false,
+    animations = true,
     lastConfig = "",
     disableInVIP = false,
     aimbotSkipFriends = true,
@@ -99,6 +100,120 @@ local config = {
     defaultFov = 70,
     autoInteractFilter = "",
     gamePreset = "",
+    worldScanInterval = 3,
+    overlayDock = "TL",
+    recentConfigs = {},
+    fisch = {
+        autoCastDelay=0.6,
+        autoReelDelay=0.4,
+        rarityFilter="Common,Uncommon,Rare",
+        autoSellThreshold=0,
+        autoCast=false,
+        autoReel=false,
+        autoMiniGame=false,
+        perfectOnly=false,
+        loopAutoFish=false,
+        valueFilter=0,
+        ignoreTrash=true,
+        whitelist="",
+        blacklist="",
+        focusMode="Balanced",
+        hotspotQuick={"Hotspot 1","Hotspot 2","Hotspot 3"},
+        spotTeleport="",
+        autoSellOnFull=false,
+        sellKeepRarity="Rare",
+        sellKeepValue=100,
+        autoDiscardTrash=true,
+        sortMode="Rarity",
+        lockList="",
+        autoEquipBest=true,
+        autoUpgradeLevel=0,
+        autoBait=true,
+        loadouts={},
+        depthPreference="Any",
+        boatAssist=false,
+        fishHud=true,
+        antiAfk=true,
+        eventNotify=true,
+        perfectBias=true,
+        fullLoop=true,
+        mode="Balanced",
+    },
+    fishit = {
+        tpSpot="Ocean",
+        tpVendor="Shop",
+        tpUpgrade="Upgrade Station",
+        tpBait="Bait Vendor",
+        savedWaypoint="Favorite 1",
+        xpMode=false,
+        moneyMode=true,
+        autoSellFull=true,
+        autoSellRarity="Rare",
+        autoSellValue=250,
+        autoDiscardJunk=true,
+        lockFavorites=true,
+        sortMode="Rarity",
+        autoEquipBest=true,
+        autoUpgradeTarget=5,
+        autoBait=true,
+        loadout="Money Rod",
+        hotspotEsp=true,
+        vendorEsp=true,
+        pierLabels=true,
+        fullbright=true,
+        noFog=true,
+        fov=80,
+        overlayMode="Money/hour",
+        eventOnly=false,
+        tpEventOnStart=true,
+        antiAfk=true,
+        rejoinLowPop=false,
+        profile="Ocean Farm",
+    },
+    fischPro = {
+        mode="Always complete",
+        rarityTier="Rare+",
+        valueFilter=0,
+        whitelist="",
+        blacklist="",
+        targetProfile="XP grind",
+        region="Ocean",
+        routePreset="Snowcap cave route",
+        conditionPreset="Foggy night mythic",
+        autoSwitchTime=true,
+        autoSwitchWeather=true,
+        loadout="Deep ocean mythic",
+        baitRule="Don’t waste rare bait",
+        boatRoute="Harbor loop",
+        bestiaryFocus="Mythic",
+        hotspotEsp=true,
+        landmarkEsp=true,
+        mythicMarker=true,
+        autoSellRarity="Rare+",
+        autoSellValue=500,
+        lockFavorites=true,
+        profitTrack=true,
+        alertEvents=true,
+        bossTargets="",
+        antiAfk=true,
+        rejoinMode="None",
+        overlayProfile="Session",
+        theme="Nautical",
+    },
+    forgePlanner = {
+        tab="Home",
+        theme="Lava",
+        oreRoute="Goblin Caves",
+        oreGoal=1000,
+        recipeTag="DPS",
+        weaponProfile="Fire greatsword",
+        armorProfile="Goblin Cave tank set",
+        runePage="DPS page",
+        zoneRoute="Recommended order",
+        economyMode="Sell vs Forge",
+        overlay=true,
+    },
+    forge = {autoInsert=true, autoCollect=true, anvilTolerance=0.18},
 }
 local hidden = false
 
@@ -110,10 +225,18 @@ local connections = {}
 local highlightObjects, nametagObjects, arrowObjects, tracerObjects = {}, {}, {}, {}
 local worldHighlights = {}
 local blurEffect
+local sessionEvents = {}
+local updateTimeline
+local gameNameLower = string.lower(game.Name or "")
+local isFisch = game.PlaceId==16732694052 or gameNameLower:find("fisch")
+local isFishIt = gameNameLower:find("fish it") ~= nil or gameNameLower:find("fishit") ~= nil or gameNameLower:find("fish") ~= nil
+local isForge = gameNameLower:find("forge") ~= nil
 local flyEnabled, flyBV = false, nil
+local islandSpots = {}
 local noclipEnabled = false
 local autoClickEnabled = false
 local autoInteractEnabled = false
+local worldEspState = {tags=nil,fill=nil,outline=nil}
 local sprinting = false
 local infiniteJump = false
 local safeWalkEnabled = false
@@ -125,7 +248,17 @@ offscreenGui.Parent = game:GetService("CoreGui")
 
 -- Utility
 local function makeCorner(obj,r) local c=Instance.new("UICorner"); c.CornerRadius=UDim.new(0,r or 10); c.Parent=obj end
-local function tween(obj,time,props,style,dir) return TweenService:Create(obj,TweenInfo.new(time,style or Enum.EasingStyle.Quint,dir or Enum.EasingDirection.Out),props) end
+local function tween(obj,time,props,style,dir)
+    if config and config.animations==false then
+        for k,v in pairs(props) do obj[k]=v end
+        local fake={}
+        function fake:Play() return self end
+        function fake:Destroy() end
+        fake.Completed={Connect=function(_,cb) if cb then cb() end return {Disconnect=function() end} end}
+        return fake
+    end
+    return TweenService:Create(obj,TweenInfo.new(time,style or Enum.EasingStyle.Quint,dir or Enum.EasingDirection.Out),props)
+end
 local function ripple(button)
     local r=Instance.new("Frame"); r.BackgroundColor3=colors.accent; r.BackgroundTransparency=0.4; r.Size=UDim2.fromOffset(0,0)
     r.AnchorPoint=Vector2.new(0.5,0.5); r.Position=UDim2.new(0.5,0,0.5,0); r.BorderSizePixel=0; r.ZIndex=5; r.Parent=button
@@ -167,6 +300,62 @@ local function setBlur(on, size)
     end
 end
 local function applyTheme() colors = themes[config.theme] or colors end
+local function parseColor(text)
+    local r,g,b = string.match(text or "", "(%d+)%s*,%s*(%d+)%s*,%s*(%d+)")
+    if r and g and b then
+        return Color3.fromRGB(tonumber(r), tonumber(g), tonumber(b))
+    end
+end
+local function refreshIslands()
+    islandSpots = {}
+    local seen = {}
+    for _,loc in ipairs(config.teleportList or {}) do
+        if loc.name and loc.pos then
+            table.insert(islandSpots, {name=loc.name, pos=loc.pos})
+            seen[loc.name] = true
+        end
+    end
+    for _,obj in ipairs(workspace:GetDescendants()) do
+        local lower = string.lower(obj.Name or "")
+        if lower:find("island") then
+            local pos
+            if obj:IsA("BasePart") then
+                pos = obj.Position
+            elseif obj:IsA("Model") then
+                if obj.PrimaryPart then
+                    pos = obj.PrimaryPart.Position
+                else
+                    local cf = obj:GetBoundingBox()
+                    pos = cf.Position
+                end
+            end
+            if pos and not seen[obj.Name] then
+                table.insert(islandSpots, {name=obj.Name, pos=pos})
+                seen[obj.Name] = true
+            end
+        end
+    end
+    if #islandSpots==0 and HRP then
+        table.insert(islandSpots, {name="Current", pos=HRP.Position})
+    end
+end
+local function softPanic()
+    config.aimbotEnabled=false
+    config.esp.enabled=false
+    flyEnabled=false
+    noclipEnabled=false
+    autoClickEnabled=false
+    autoInteractEnabled=false
+    clearESP(); clearWorldESP()
+    Hum.WalkSpeed=wsDefault; Hum.JumpPower=jpDefault; workspace.Gravity=gravityDefault
+    pushLog("Soft panic: disabled toggles")
+    toast("Soft panic: toggles disabled")
+end
+local function formatColor(c)
+    if not c then return "" end
+    local r,g,b = math.floor(c.R*255), math.floor(c.G*255), math.floor(c.B*255)
+    return string.format("%d, %d, %d", r,g,b)
+end
 local function applyOpacity(guiObj)
     for _,obj in ipairs(guiObj:GetDescendants()) do
         if obj:IsA("Frame") or obj:IsA("TextButton") or obj:IsA("TextLabel") then
@@ -188,11 +377,22 @@ local function saveConfigToFile(name)
     local path="ADVHub/"..name..".json"
     local ok,err=pcall(function() writefile(path, HttpService:JSONEncode(config)) end)
     toast(ok and ("Saved "..path) or ("Save failed: "..tostring(err)))
+    table.insert(config.recentConfigs,1,name)
+    while #config.recentConfigs>3 do table.remove(config.recentConfigs) end
+    if ok then pushSessionEvent("Saved config "..name) end
 end
 local function loadConfigFromFile(name)
     local path="ADVHub/"..name..".json"
     local ok,content=pcall(function() return readfile(path) end)
-    if ok then loadConfigFromString(content); toast("Loaded "..path) else toast("Load failed") end
+    if ok then
+        loadConfigFromString(content)
+        toast("Loaded "..path)
+        table.insert(config.recentConfigs,1,name)
+        while #config.recentConfigs>3 do table.remove(config.recentConfigs) end
+        pushSessionEvent("Loaded config "..name)
+    else
+        toast("Load failed")
+    end
 end
 local function autoLoadConfig()
     ensureDir()
@@ -265,13 +465,13 @@ local function makeSlider(parent,label,min,max,default,cb)
     setVal(default); return setVal
 end
 
-local function makeDropdown(parent,label,options,cb)
+local function makeDropdown(parent,label,options,cb,defaultVal)
     local f=Instance.new("Frame"); f.Size=UDim2.new(1,-10,0,40); f.BackgroundColor3=colors.panel; f.BorderSizePixel=0; makeCorner(f,10); f.Parent=parent
     local l=Instance.new("TextLabel"); l.BackgroundTransparency=1; l.Size=UDim2.new(0.5,-10,1,0); l.Position=UDim2.new(0,12,0,0); l.Font=Enum.Font.Gotham; l.TextColor3=colors.text; l.TextSize=15; l.TextXAlignment=Enum.TextXAlignment.Left; l.Text=label; l.Parent=f
     local btn=Instance.new("TextButton"); btn.Size=UDim2.new(0.5,-20,1,-8); btn.Position=UDim2.new(0.5,8,0,4); btn.BackgroundColor3=colors.bg; btn.BorderSizePixel=0; btn.TextColor3=colors.text; btn.Font=Enum.Font.GothamSemibold; btn.TextSize=14; btn.Text=options[1] or "Select"; makeCorner(btn,8); btn.Parent=f
     local function set(val) btn.Text=val; if cb then cb(val) end end
     btn.MouseButton1Click:Connect(function() ripple(btn); local next=1; for i,opt in ipairs(options) do if opt==btn.Text then next=i%#options+1 end end; set(options[next]) end)
-    set(options[1]); return set
+    set(defaultVal or options[1]); return set
 end
 
 -- ESP helpers
@@ -285,6 +485,168 @@ end
 local function clearWorldESP()
     for _,o in ipairs(worldHighlights) do o:Destroy() end
     worldHighlights = {}
+end
+
+local function addWorldTagESP(tagList, fill, outline)
+    clearWorldESP()
+    worldEspState = {tags=tagList, fill=fill, outline=outline}
+    for _,d in ipairs(workspace:GetDescendants()) do
+        if d:IsA("BasePart") then
+            for _,tag in ipairs(tagList) do
+                if d.Name:lower():find(tag) then
+                    local h=Instance.new("Highlight"); h.FillColor=fill; h.OutlineColor=outline; h.Adornee=d; h.Parent=d; table.insert(worldHighlights,h)
+                    break
+                end
+            end
+        end
+    end
+end
+
+local function sectionTitle(parent,text,sub)
+    local t=Instance.new("TextLabel"); t.BackgroundTransparency=1; t.Size=UDim2.new(1,-10,0,sub and 18 or 22); t.Font=sub and Enum.Font.Gotham or Enum.Font.GothamSemibold; t.TextColor3=sub and colors.subtle or colors.text; t.TextSize=sub and 13 or 15; t.TextXAlignment=Enum.TextXAlignment.Left; t.Text=text; t.Parent=parent; return t
+end
+
+local function buildFishAutomation(parent)
+    sectionTitle(parent,"Fish It / Fisch Automation")
+    sectionTitle(parent,"Full loop: cast, hook, reel, sell, travel",true)
+
+    local fishFilter=Instance.new("TextBox"); fishFilter.Size=UDim2.new(1,-10,0,30); fishFilter.BackgroundColor3=colors.bg; fishFilter.TextColor3=colors.text; fishFilter.Text=config.esp.nameFilter~="" and config.esp.nameFilter or "fish,hotspot"; fishFilter.PlaceholderText="Tags: fish,hotspot"; fishFilter.BorderSizePixel=0; fishFilter.Font=Enum.Font.Gotham; fishFilter.TextSize=14; makeCorner(fishFilter,8); fishFilter.Parent=parent
+    fishFilter.FocusLost:Connect(function() config.esp.nameFilter=fishFilter.Text end)
+
+    makeToggle(parent,"Fishing: Auto Interact (reel)",function(on) config.autoInteractFilter="reel"; autoInteractEnabled=on; pushSessionEvent("Auto interact "..(on and "on" or "off")) end)
+    makeToggle(parent,"Fishing: ESP (fish/hotspots)",function(on)
+        if on then
+            local tags={}
+            for t in string.gmatch(string.lower(fishFilter.Text), "([^,]+)") do table.insert(tags, t:match("^%s*(.-)%s*$")) end
+            addWorldTagESP(tags, Color3.fromRGB(60,200,255), Color3.fromRGB(10,120,200))
+            pushSessionEvent("Fish ESP on")
+        else
+            clearWorldESP()
+            pushSessionEvent("Fish ESP off")
+        end
+    end)
+    addDivider(parent)
+
+    sectionTitle(parent,"Core Auto-Fishing")
+    makeToggle(parent,"Auto Cast",function(on) config.fisch.autoCast=on; pushSessionEvent("Auto Cast "..(on and "enabled" or "disabled")) end, config.fisch.autoCast)
+    makeSlider(parent,"Auto-cast delay",0,2,config.fisch.autoCastDelay or 0.6,function(v) config.fisch.autoCastDelay=v end)
+    makeToggle(parent,"Auto Reel",function(on) config.fisch.autoReel=on; pushSessionEvent("Auto Reel "..(on and "enabled" or "disabled")) end, config.fisch.autoReel)
+    makeSlider(parent,"Auto-reel delay",0,2,config.fisch.autoReelDelay or 0.4,function(v) config.fisch.autoReelDelay=v end)
+    makeToggle(parent,"Auto Mini-Game Solver",function(on) config.fisch.autoMiniGame=on; pushSessionEvent("Mini-game solver "..(on and "on" or "off")) end, config.fisch.autoMiniGame)
+    makeToggle(parent,"Perfect timing bias",function(on) config.fisch.perfectBias=on end, config.fisch.perfectBias)
+    makeToggle(parent,"Loop Auto-Fish (cast→hook→reel)",function(on) config.fisch.fullLoop=on; config.fisch.loopAutoFish=on; pushSessionEvent("Loop auto-fish "..(on and "on" or "off")) end, config.fisch.fullLoop)
+    addDivider(parent)
+
+    sectionTitle(parent,"Targeting & Modes")
+    local rarityBox=Instance.new("TextBox"); rarityBox.Size=UDim2.new(1,-10,0,30); rarityBox.BackgroundColor3=colors.bg; rarityBox.TextColor3=colors.text; rarityBox.Text=config.fisch.rarityFilter; rarityBox.PlaceholderText="Rarity filter (comma)"; rarityBox.BorderSizePixel=0; rarityBox.Font=Enum.Font.Gotham; rarityBox.TextSize=14; makeCorner(rarityBox,8); rarityBox.Parent=parent; rarityBox.FocusLost:Connect(function() config.fisch.rarityFilter=rarityBox.Text end)
+    makeSlider(parent,"Value filter (keep >= coins)",0,2000,config.fisch.valueFilter or 0,function(v) config.fisch.valueFilter=v end)
+    makeToggle(parent,"Ignore trash-tier fish",function(on) config.fisch.ignoreTrash=on end, config.fisch.ignoreTrash)
+    local whitelistBox=Instance.new("TextBox"); whitelistBox.Size=UDim2.new(1,-10,0,30); whitelistBox.BackgroundColor3=colors.bg; whitelistBox.TextColor3=colors.text; whitelistBox.Text=config.fisch.whitelist; whitelistBox.PlaceholderText="Whitelist (comma fish names)"; whitelistBox.BorderSizePixel=0; whitelistBox.Font=Enum.Font.Gotham; whitelistBox.TextSize=14; makeCorner(whitelistBox,8); whitelistBox.Parent=parent; whitelistBox.FocusLost:Connect(function() config.fisch.whitelist=whitelistBox.Text end)
+    local blacklistBox=Instance.new("TextBox"); blacklistBox.Size=UDim2.new(1,-10,0,30); blacklistBox.BackgroundColor3=colors.bg; blacklistBox.TextColor3=colors.text; blacklistBox.Text=config.fisch.blacklist; blacklistBox.PlaceholderText="Blacklist (comma junk fish)"; blacklistBox.BorderSizePixel=0; blacklistBox.Font=Enum.Font.Gotham; blacklistBox.TextSize=14; makeCorner(blacklistBox,8); blacklistBox.Parent=parent; blacklistBox.FocusLost:Connect(function() config.fisch.blacklist=blacklistBox.Text end)
+    makeDropdown(parent,"Mode",{"Balanced","XP mode","Money mode"},function(v) config.fisch.mode=v; pushSessionEvent("Mode: "..v) end, config.fisch.mode or "Balanced")
+    addDivider(parent)
+
+    sectionTitle(parent,"Hotspots & Travel")
+    makeDropdown(parent,"Teleport fishing spot",{"Ocean","River","Lake","Lava","Ice Cave","Deep Sea"},function(v) config.fisch.spotTeleport=v end, config.fisch.spotTeleport ~= "" and config.fisch.spotTeleport or "Ocean")
+    makeButton(parent,"Teleport to spot",function() pushSessionEvent("Teleport to fishing spot: "..(config.fisch.spotTeleport or "Ocean")); toast("Teleporting to "..(config.fisch.spotTeleport or "Ocean")) end)
+    makeButton(parent,"Rescan hotspots",function() pushSessionEvent("Hotspots rescanned") end)
+    local hotspotRow=Instance.new("Frame"); hotspotRow.Size=UDim2.new(1,-10,0,30); hotspotRow.BackgroundTransparency=1; hotspotRow.Parent=parent
+    local hl=Instance.new("UIListLayout",hotspotRow); hl.FillDirection=Enum.FillDirection.Horizontal; hl.Padding=UDim.new(0,6)
+    for _,label in ipairs(config.fisch.hotspotQuick) do
+        local b=Instance.new("TextButton"); b.Size=UDim2.fromOffset(90,26); b.BackgroundColor3=colors.bg; b.BorderSizePixel=0; b.TextColor3=colors.text; b.Font=Enum.Font.GothamSemibold; b.TextSize=13; b.Text=label; makeCorner(b,8); b.Parent=hotspotRow
+        b.MouseButton1Click:Connect(function() pushSessionEvent("Hop to "..label); toast("Hotspot hop: "..label) end)
+    end
+    addDivider(parent)
+
+    sectionTitle(parent,"Inventory & Selling")
+    makeToggle(parent,"Auto-sell on full inventory",function(on) config.fisch.autoSellOnFull=on end, config.fisch.autoSellOnFull)
+    makeDropdown(parent,"Keep rarity or higher",{"Common","Uncommon","Rare","Epic","Legendary","Mythical"},function(v) config.fisch.sellKeepRarity=v end, config.fisch.sellKeepRarity)
+    makeSlider(parent,"Keep if value >=",0,2000,config.fisch.sellKeepValue or 100,function(v) config.fisch.sellKeepValue=v end)
+    makeToggle(parent,"Auto-discard trash / junk",function(on) config.fisch.autoDiscardTrash=on end, config.fisch.autoDiscardTrash)
+    makeDropdown(parent,"Sort by",{"Rarity","Value","Size"},function(v) config.fisch.sortMode=v end, config.fisch.sortMode)
+    local lockBox=Instance.new("TextBox"); lockBox.Size=UDim2.new(1,-10,0,30); lockBox.BackgroundColor3=colors.bg; lockBox.TextColor3=colors.text; lockBox.Text=config.fisch.lockList or ""; lockBox.PlaceholderText="Lock list (favorites)"; lockBox.BorderSizePixel=0; lockBox.Font=Enum.Font.Gotham; lockBox.TextSize=14; makeCorner(lockBox,8); lockBox.Parent=parent; lockBox.FocusLost:Connect(function() config.fisch.lockList=lockBox.Text end)
+    addDivider(parent)
+
+    sectionTitle(parent,"Gear & Bait")
+    makeToggle(parent,"Auto-equip best rod",function(on) config.fisch.autoEquipBest=on; config.fishit.autoEquipBest=on end, config.fisch.autoEquipBest)
+    makeSlider(parent,"Auto-upgrade rod to level",0,20,config.fisch.autoUpgradeLevel or 0,function(v) config.fisch.autoUpgradeLevel=v end)
+    makeToggle(parent,"Auto-apply bait",function(on) config.fisch.autoBait=on; config.fishit.autoBait=on end, config.fisch.autoBait)
+    makeDropdown(parent,"Loadout",{"XP rod","Money rod","Boss rod"},function(v) config.fishit.loadout=v end, config.fishit.loadout)
+    addDivider(parent)
+
+    if isFishIt then
+        sectionTitle(parent,"Fish It Travel & Vendors")
+        makeDropdown(parent,"Teleport fishing biome",{"Ocean","River","Lake","Cave","Lava","Deep sea"},function(v) config.fishit.tpSpot=v end, config.fishit.tpSpot)
+        makeDropdown(parent,"Vendor teleports",{"Shop","Sell NPC","Bait Vendor","Upgrade Station"},function(v) config.fishit.tpVendor=v end, config.fishit.tpVendor)
+        makeButton(parent,"Teleport to vendor",function() pushSessionEvent("Fish It vendor TP: "..(config.fishit.tpVendor or "Shop")) end)
+        makeDropdown(parent,"Saved waypoint",{"Favorite 1","Favorite 2","Favorite 3"},function(v) config.fishit.savedWaypoint=v end, config.fishit.savedWaypoint)
+        makeToggle(parent,"Hotspot ESP",function(on) config.fishit.hotspotEsp=on end, config.fishit.hotspotEsp)
+        makeToggle(parent,"Vendor/NPC ESP",function(on) config.fishit.vendorEsp=on end, config.fishit.vendorEsp)
+        makeToggle(parent,"Pier labels",function(on) config.fishit.pierLabels=on end, config.fishit.pierLabels)
+        makeToggle(parent,"Fullbright / no fog",function(on) config.fishit.fullbright=on; config.fishit.noFog=on end, config.fishit.fullbright)
+        makeSlider(parent,"Camera FOV",60,110,config.fishit.fov,function(v) config.fishit.fov=v; camera.FieldOfView=v end)
+        makeDropdown(parent,"Overlay mode",{"Money/hour","XP/hour","Fish per minute"},function(v) config.fishit.overlayMode=v end, config.fishit.overlayMode)
+        makeToggle(parent,"Event-only fishing",function(on) config.fishit.eventOnly=on end, config.fishit.eventOnly)
+        makeToggle(parent,"Teleport to event on start",function(on) config.fishit.tpEventOnStart=on end, config.fishit.tpEventOnStart)
+        makeToggle(parent,"Anti-AFK",function(on) config.fishit.antiAfk=on end, config.fishit.antiAfk)
+        makeToggle(parent,"Rejoin low-pop server",function(on) config.fishit.rejoinLowPop=on end, config.fishit.rejoinLowPop)
+        addDivider(parent)
+    end
+
+    if isFisch then
+        sectionTitle(parent,"Fisch Regions & Routes")
+        makeDropdown(parent,"Region",{"Ocean","Moosewood","Roslit Bay","Snowcap","Sunstone","Terrapin","Mushgrove Swamp","Depths","Forsaken Shores","Ancient Isle"},function(v) config.fischPro.region=v end, config.fischPro.region)
+        makeDropdown(parent,"Route preset",{"Snowcap cave route","Ocean mythic loop","Harbor hotspots"},function(v) config.fischPro.routePreset=v end, config.fischPro.routePreset)
+        makeDropdown(parent,"Condition preset",{"Foggy night mythic","Sunny day legendary","Rainy treasure"},function(v) config.fischPro.conditionPreset=v end, config.fischPro.conditionPreset)
+        makeToggle(parent,"Auto-switch on time/weather",function(on) config.fischPro.autoSwitchTime=on; config.fischPro.autoSwitchWeather=on end, config.fischPro.autoSwitchTime)
+        makeDropdown(parent,"Mode",{"Always complete","Perfect focus","Humanized"},function(v) config.fischPro.mode=v end, config.fischPro.mode)
+        makeDropdown(parent,"Rarity target",{"Trash","Common","Uncommon","Unusual","Rare","Legendary","Mythical","Relic","Event"},function(v) config.fischPro.rarityTier=v end, config.fischPro.rarityTier)
+        makeSlider(parent,"Value filter (sell <)",0,3000,config.fischPro.autoSellValue or 500,function(v) config.fischPro.autoSellValue=v end)
+        local white=Instance.new("TextBox"); white.Size=UDim2.new(1,-10,0,30); white.BackgroundColor3=colors.bg; white.TextColor3=colors.text; white.Text=config.fischPro.whitelist; white.PlaceholderText="Whitelist (named fish)"; white.BorderSizePixel=0; white.Font=Enum.Font.Gotham; white.TextSize=14; makeCorner(white,8); white.Parent=parent; white.FocusLost:Connect(function() config.fischPro.whitelist=white.Text end)
+        local black=Instance.new("TextBox"); black.Size=UDim2.new(1,-10,0,30); black.BackgroundColor3=colors.bg; black.TextColor3=colors.text; black.Text=config.fischPro.blacklist; black.PlaceholderText="Blacklist junk"; black.BorderSizePixel=0; black.Font=Enum.Font.Gotham; black.TextSize=14; makeCorner(black,8); black.Parent=parent; black.FocusLost:Connect(function() config.fischPro.blacklist=black.Text end)
+        makeDropdown(parent,"Profile",{"XP grind","Money farm","Collection (Bestiary)"},function(v) config.fischPro.targetProfile=v end, config.fischPro.targetProfile)
+        makeDropdown(parent,"Loadout",{"Deep ocean mythic","Snowcap cave","Event fish"},function(v) config.fischPro.loadout=v end, config.fischPro.loadout)
+        makeDropdown(parent,"Bait rule",{"Don’t waste rare bait","Use best bait","Use cheap bait"},function(v) config.fischPro.baitRule=v end, config.fischPro.baitRule)
+        makeDropdown(parent,"Boat route",{"Harbor loop","Island hop","Dock > hotspot"},function(v) config.fischPro.boatRoute=v end, config.fischPro.boatRoute)
+        makeDropdown(parent,"Bestiary focus",{"Mythic","Relic","Event","Full completion"},function(v) config.fischPro.bestiaryFocus=v end, config.fischPro.bestiaryFocus)
+        makeToggle(parent,"Hotspot ESP",function(on) config.fischPro.hotspotEsp=on end, config.fischPro.hotspotEsp)
+        makeToggle(parent,"Landmark ESP",function(on) config.fischPro.landmarkEsp=on end, config.fischPro.landmarkEsp)
+        makeToggle(parent,"Mythic condition markers",function(on) config.fischPro.mythicMarker=on end, config.fischPro.mythicMarker)
+        makeToggle(parent,"Lock favorites",function(on) config.fischPro.lockFavorites=on end, config.fischPro.lockFavorites)
+        makeToggle(parent,"Profit tracking HUD",function(on) config.fischPro.profitTrack=on end, config.fischPro.profitTrack)
+        makeToggle(parent,"Alert rare events/boss windows",function(on) config.fischPro.alertEvents=on end, config.fischPro.alertEvents)
+        local bossBox=Instance.new("TextBox"); bossBox.Size=UDim2.new(1,-10,0,30); bossBox.BackgroundColor3=colors.bg; bossBox.TextColor3=colors.text; bossBox.Text=config.fischPro.bossTargets; bossBox.PlaceholderText="Boss/secret fish targets"; bossBox.BorderSizePixel=0; bossBox.Font=Enum.Font.Gotham; bossBox.TextSize=14; makeCorner(bossBox,8); bossBox.Parent=parent; bossBox.FocusLost:Connect(function() config.fischPro.bossTargets=bossBox.Text end)
+        makeDropdown(parent,"Rejoin mode",{"None","Same server","New low-pop","New high-pop"},function(v) config.fischPro.rejoinMode=v end, config.fischPro.rejoinMode)
+        makeDropdown(parent,"Overlay profile",{"Session","Coins/hour","XP/hour"},function(v) config.fischPro.overlayProfile=v end, config.fischPro.overlayProfile)
+        addDivider(parent)
+    end
+end
+
+local function buildForgePlanner(parent)
+    sectionTitle(parent,"ForgeMaster Hub")
+    sectionTitle(parent,"Plan routes, recipes, and gear without exploits",true)
+
+    sectionTitle(parent,"Mining & Ore Planning")
+    makeDropdown(parent,"Ore route",{"Goblin Caves","Volcanic Depths","Crystal Hollows"},function(v) config.forgePlanner.oreRoute=v end, config.forgePlanner.oreRoute)
+    makeSlider(parent,"Ore goal",0,5000,config.forgePlanner.oreGoal or 1000,function(v) config.forgePlanner.oreGoal=v end)
+    makeDropdown(parent,"Economy focus",{"Gold/hour","Ore/hour","Quest"},function(v) config.forgePlanner.economyMode=v end, config.forgePlanner.economyMode)
+    addDivider(parent)
+
+    sectionTitle(parent,"Forging Simulator")
+    makeDropdown(parent,"Recipe tag",{"DPS","Tank","Hybrid","Farm"},function(v) config.forgePlanner.recipeTag=v end, config.forgePlanner.recipeTag)
+    makeDropdown(parent,"Weapon profile",{"Fire greatsword","Crit dual blades","Safe tank sword"},function(v) config.forgePlanner.weaponProfile=v end, config.forgePlanner.weaponProfile)
+    makeDropdown(parent,"Armor profile",{"Goblin Cave tank set","Volcanic Depths survival","Boss fight kit"},function(v) config.forgePlanner.armorProfile=v end, config.forgePlanner.armorProfile)
+    addDivider(parent)
+
+    sectionTitle(parent,"Runes & Builds")
+    makeDropdown(parent,"Rune page",{"DPS page","Tank page","Utility/balance"},function(v) config.forgePlanner.runePage=v end, config.forgePlanner.runePage)
+    makeDropdown(parent,"Zone roadmap",{"Recommended order","Danger-first","Quest-first"},function(v) config.forgePlanner.zoneRoute=v end, config.forgePlanner.zoneRoute)
+    addDivider(parent)
+
+    sectionTitle(parent,"Session HUD")
+    makeToggle(parent,"Show overlay",function(on) config.forgePlanner.overlay=on end, config.forgePlanner.overlay)
+    makeDropdown(parent,"Theme",{"Lava","Icy","Clean","Dark"},function(v) config.forgePlanner.theme=v end, config.forgePlanner.theme)
+    addDivider(parent)
 end
 
 local function applyEspPreset(name)
@@ -349,6 +711,10 @@ local function setMainSize(w,h)
     main.Size = UDim2.fromOffset(w,h)
     main.Position = UDim2.new(0.5,-w/2,0.5,-h/2)
 end
+
+local function addDivider(parent)
+    local d=Instance.new("Frame"); d.Size=UDim2.new(1,-10,0,1); d.BackgroundColor3=colors.subtle; d.BackgroundTransparency=0.8; d.BorderSizePixel=0; d.Parent=parent; return d
+end
 local grad=Instance.new("UIGradient",main); grad.Color=ColorSequence.new{ColorSequenceKeypoint.new(0,colors.bg),ColorSequenceKeypoint.new(1,colors.accent2)}; grad.Rotation=60
 local grip = Instance.new("Frame"); grip.Size=UDim2.fromOffset(14,14); grip.Position=UDim2.new(1,-18,1,-18); grip.BackgroundColor3=colors.panel; grip.BorderSizePixel=0; makeCorner(grip,4); grip.Parent=main
 makeDraggable(grip, function(delta)
@@ -356,7 +722,8 @@ makeDraggable(grip, function(delta)
 end)
 
 -- Title
-local title=Instance.new("Frame"); title.Size=UDim2.new(1,0,0,46); title.BackgroundColor3=colors.panel; title.BorderSizePixel=0; title.Parent=main; makeCorner(title,12)
+local titleHeight = 48
+local title=Instance.new("Frame"); title.Size=UDim2.new(1,0,0,titleHeight); title.BackgroundColor3=colors.panel:lerp(Color3.new(0,0,0),0.16); title.BorderSizePixel=0; title.Parent=main; makeCorner(title,12)
 local titleLabel=Instance.new("TextLabel"); titleLabel.Size=UDim2.new(1,-170,1,0); titleLabel.Position=UDim2.new(0,18,0,6); titleLabel.BackgroundTransparency=1; titleLabel.Font=Enum.Font.GothamBold; titleLabel.Text="Ninnydll"; titleLabel.TextColor3=Color3.fromRGB(255,215,120); titleLabel.TextSize=18; titleLabel.TextXAlignment=Enum.TextXAlignment.Left; titleLabel.Parent=title
 task.spawn(function()
     local gold1 = Color3.fromRGB(255,215,120)
@@ -373,9 +740,19 @@ local logLabel=Instance.new("TextLabel"); logLabel.Size=UDim2.new(0,180,1,0); lo
 local function pushLog(msg)
     if logLabel then logLabel.Text = msg end
 end
+local function pushSessionEvent(msg)
+    local stamp = os.date("%H:%M:%S")
+    table.insert(sessionEvents, 1, string.format("[%s] %s", stamp, msg))
+    while #sessionEvents > 6 do table.remove(sessionEvents) end
+    if updateTimeline then updateTimeline() end
+end
+local underline=Instance.new("Frame"); underline.Size=UDim2.new(1,-16,0,1); underline.Position=UDim2.new(0,8,1,-1); underline.BackgroundColor3=colors.accent; underline.BorderSizePixel=0; underline.Parent=title
 
 -- Status bar
-local statusLabel=Instance.new("TextLabel"); statusLabel.BackgroundTransparency=1; statusLabel.Size=UDim2.new(0, 220, 0, 20); statusLabel.Position=UDim2.new(1,-230,0,48); statusLabel.Font=Enum.Font.Gotham; statusLabel.TextColor3=colors.subtle; statusLabel.TextSize=13; statusLabel.TextXAlignment=Enum.TextXAlignment.Right; statusLabel.Parent=main
+local statusHeight = 26
+local statusBar=Instance.new("Frame"); statusBar.Size=UDim2.new(1,-14,0,statusHeight); statusBar.Position=UDim2.new(0,7,0,titleHeight); statusBar.BackgroundColor3=colors.panel:lerp(colors.bg,0.4); statusBar.BorderSizePixel=0; statusBar.Parent=main; makeCorner(statusBar,10)
+local statusLabel=Instance.new("TextLabel"); statusLabel.BackgroundTransparency=1; statusLabel.Size=UDim2.new(1,-20,1,0); statusLabel.Position=UDim2.new(0,10,0,0); statusLabel.Font=Enum.Font.GothamSemibold; statusLabel.TextColor3=colors.subtle; statusLabel.TextSize=13; statusLabel.TextXAlignment=Enum.TextXAlignment.Left; statusLabel.Parent=statusBar
+local contentTop = titleHeight + statusHeight + 12
 
 -- Quick pills
 local quick=Instance.new("Frame"); quick.Size=UDim2.new(0, mainWidth, 0, 32); quick.Position=UDim2.new(0,0,0,-40); quick.BackgroundTransparency=1; quick.Parent=main
@@ -385,18 +762,23 @@ local function pill(label,color,cb) local b=Instance.new("TextButton"); b.Size=U
 pill("Panic",colors.danger,function() clearESP(); gui:Destroy(); offscreenGui:Destroy(); setBlur(false); Hum.WalkSpeed=wsDefault; Hum.JumpPower=jpDefault; workspace.Gravity=gravityDefault end)
 pill("Hide UI",colors.accent2,function() hidden=not hidden; main.Visible=not hidden; offscreenGui.Enabled=not hidden end)
 pill("Rejoin",colors.accent,function() TeleportService:Teleport(game.PlaceId,LP) end)
+pill("Soft Panic",colors.warn,softPanic)
 
 -- Tabs & pages
-local tabs=Instance.new("Frame"); tabs.Size=UDim2.new(0,175,1,-52); tabs.Position=UDim2.new(0,0,0,52); tabs.BackgroundColor3=colors.panel; tabs.BorderSizePixel=0; tabs.Parent=main; makeCorner(tabs,12)
+local tabs=Instance.new("Frame"); tabs.Size=UDim2.new(0,175,1,-contentTop-10); tabs.Position=UDim2.new(0,0,0,contentTop); tabs.BackgroundColor3=colors.panel; tabs.BorderSizePixel=0; tabs.Parent=main; makeCorner(tabs,12)
 local tabsPad = Instance.new("UIPadding", tabs); tabsPad.PaddingLeft = UDim.new(0,8); tabsPad.PaddingRight = UDim.new(0,8); tabsPad.PaddingTop = UDim.new(0,10)
 local tabList=Instance.new("UIListLayout",tabs); tabList.VerticalAlignment=Enum.VerticalAlignment.Top; tabList.HorizontalAlignment=Enum.HorizontalAlignment.Center; tabList.Padding=UDim.new(0, config.compact and 6 or 8)
 local tabNames={"Dashboard","Movement","Visuals","Combat","Automation","Player List","Script Hub","Configs","Protection","UI / Theme"}
+local tabIcons={
+    Dashboard="🏠", Movement="🏃", Visuals="👁", Combat="🎯", Automation="⚙️", ["Player List"]="🧑", ["Script Hub"]="📜", Configs="💾", Protection="🛡", ["UI / Theme"]="🎨"
+}
 local pages={}
 local selectedTab
-local pageHolder=Instance.new("Frame"); pageHolder.Size=UDim2.new(1,-185,1,-62); pageHolder.Position=UDim2.new(0,185,0,52); pageHolder.BackgroundTransparency=1; pageHolder.Parent=main
+local pageHolder=Instance.new("Frame"); pageHolder.Size=UDim2.new(1,-185,1,-contentTop-10); pageHolder.Position=UDim2.new(0,185,0,contentTop); pageHolder.BackgroundColor3=colors.panel:lerp(colors.bg,0.35); pageHolder.BorderSizePixel=0; pageHolder.Parent=main; makeCorner(pageHolder,14)
+local pagePadding=Instance.new("UIPadding",pageHolder); pagePadding.PaddingTop=UDim.new(0,8); pagePadding.PaddingBottom=UDim.new(0,8); pagePadding.PaddingLeft=UDim.new(0,10); pagePadding.PaddingRight=UDim.new(0,10)
 for _,name in ipairs(tabNames) do
-    local page=Instance.new("ScrollingFrame"); page.Size=UDim2.new(1,-24,1,-24); page.Position=UDim2.new(0,12,0,12); page.BackgroundTransparency=1; page.Visible=false; page.ScrollBarThickness=6; page.VerticalScrollBarInset=Enum.ScrollBarInset.ScrollBar; page.CanvasSize=UDim2.new(0,0,0,0); page.Parent=pageHolder
-    local pad=Instance.new("UIPadding",page); pad.PaddingLeft=UDim.new(0,10); pad.PaddingRight=UDim.new(0,10); pad.PaddingTop=UDim.new(0,10); pad.PaddingBottom=UDim.new(0,10)
+    local page=Instance.new("ScrollingFrame"); page.Size=UDim2.new(1,0,1,0); page.Position=UDim2.new(0,0,0,0); page.BackgroundTransparency=1; page.Visible=false; page.ScrollBarThickness=6; page.VerticalScrollBarInset=Enum.ScrollBarInset.ScrollBar; page.CanvasSize=UDim2.new(0,0,0,0); page.Parent=pageHolder
+    local pad=Instance.new("UIPadding",page); pad.PaddingLeft=UDim.new(0,12); pad.PaddingRight=UDim.new(0,12); pad.PaddingTop=UDim.new(0,12); pad.PaddingBottom=UDim.new(0,12)
     local list=Instance.new("UIListLayout",page); list.Padding=UDim.new(0, config.compact and 6 or 10); list.FillDirection=Enum.FillDirection.Vertical; list.HorizontalAlignment=Enum.HorizontalAlignment.Left; list.VerticalAlignment=Enum.VerticalAlignment.Top
     list:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function() page.CanvasSize=UDim2.new(0,0,0,list.AbsoluteContentSize.Y+20) end)
     pages[name]=page
@@ -420,7 +802,7 @@ local function switchTab(name)
     selectedTab=name
 end
 local function createTabButton(name)
-    local b=Instance.new("TextButton"); b.Size=UDim2.new(1,-24,0,38); b.BackgroundColor3=colors.bg; b.BorderSizePixel=0; b.AutoButtonColor=false; b.Font=Enum.Font.GothamSemibold; b.TextColor3=colors.text; b.TextSize=15; b.Text="   "..name; b:SetAttribute("BG",true); makeCorner(b,10); b.Parent=tabs
+    local b=Instance.new("TextButton"); b.Size=UDim2.new(1,-24,0,38); b.BackgroundColor3=colors.bg; b.BorderSizePixel=0; b.AutoButtonColor=false; b.Font=Enum.Font.GothamSemibold; b.TextColor3=colors.text; b.TextSize=15; b.Text=((tabIcons[name] or "").."  "..name); b:SetAttribute("BG",true); makeCorner(b,10); b.Parent=tabs
     b.MouseEnter:Connect(function() tween(b,0.12,{BackgroundColor3=colors.panel}) end)
     b.MouseLeave:Connect(function() if selectedTab~=name then tween(b,0.12,{BackgroundColor3=colors.bg}) end end)
     b.MouseButton1Click:Connect(function()
@@ -430,7 +812,12 @@ local function createTabButton(name)
     end)
     return b
 end
-for _,n in ipairs(tabNames) do tabButtons[n]=createTabButton(n) end
+for i,n in ipairs(tabNames) do
+    tabButtons[n]=createTabButton(n)
+    if n=="Visuals" or n=="Automation" or n=="Configs" then
+        local sep=Instance.new("Frame"); sep.Size=UDim2.new(1,-24,0,1); sep.BackgroundColor3=colors.subtle; sep.BackgroundTransparency=0.8; sep.BorderSizePixel=0; sep.Parent=tabs
+    end
+end
 switchTab("Dashboard"); tween(tabButtons["Dashboard"],0.01,{BackgroundColor3=colors.accent}); tabIndicator.Position=UDim2.new(0,4,0,tabButtons["Dashboard"].Position.Y.Offset); tabIndicator.Visible=true
 
 -- Dashboard
@@ -440,6 +827,31 @@ do
     info.Text=("Game: %s | PlaceId: %s"):format(game.Name or "Unknown", tostring(currentGameId)); info.Parent=p
     local status=Instance.new("TextLabel"); status.BackgroundTransparency=1; status.Size=UDim2.new(1,-10,0,20); status.Font=Enum.Font.Gotham; status.TextColor3=colors.subtle; status.TextSize=14; status.TextXAlignment=Enum.TextXAlignment.Left
     status.Text="Mode: Universal (no per-game module)"; status.Parent=p
+    local sessionInfo=Instance.new("TextLabel"); sessionInfo.BackgroundTransparency=1; sessionInfo.Size=UDim2.new(1,-10,0,20); sessionInfo.Font=Enum.Font.Gotham; sessionInfo.TextColor3=colors.subtle; sessionInfo.TextSize=13; sessionInfo.TextXAlignment=Enum.TextXAlignment.Left; sessionInfo.TextWrapped=true; sessionInfo.Parent=p
+    task.spawn(function()
+        while sessionInfo.Parent do
+            local elapsed = math.floor(tick()-sessionStart)
+            local lastTarget = _G.__lastTargetName or "none"
+            local lastDist = _G.__lastTargetDist and (math.floor(_G.__lastTargetDist).."m") or "--"
+            sessionInfo.Text = string.format("Session: %ds | Last preset: %s | Last config: %s | Last target: %s (%s)", elapsed, config.lastPreset ~= "" and config.lastPreset or "none", config.lastConfig ~= "" and config.lastConfig or "none", lastTarget, lastDist)
+            task.wait(1)
+        end
+    end)
+    local timelineBox=Instance.new("Frame"); timelineBox.Size=UDim2.new(1,-10,0,150); timelineBox.BackgroundColor3=colors.panel; timelineBox.BorderSizePixel=0; makeCorner(timelineBox,10); timelineBox.Parent=p
+    local tlPad=Instance.new("UIPadding",timelineBox); tlPad.PaddingTop=UDim.new(0,8); tlPad.PaddingBottom=UDim.new(0,8); tlPad.PaddingLeft=UDim.new(0,10); tlPad.PaddingRight=UDim.new(0,10)
+    local tlTitle=Instance.new("TextLabel"); tlTitle.BackgroundTransparency=1; tlTitle.Size=UDim2.new(1,0,0,18); tlTitle.Font=Enum.Font.GothamSemibold; tlTitle.TextColor3=colors.text; tlTitle.TextSize=14; tlTitle.TextXAlignment=Enum.TextXAlignment.Left; tlTitle.Text="Session Timeline"; tlTitle.Parent=timelineBox
+    local tlList=Instance.new("UIListLayout",timelineBox); tlList.Padding=UDim.new(0,6); tlList.FillDirection=Enum.FillDirection.Vertical; tlList.SortOrder=Enum.SortOrder.LayoutOrder
+    updateTimeline=function()
+        for _,child in ipairs(timelineBox:GetChildren()) do
+            if child:IsA("TextLabel") and child~=tlTitle then child:Destroy() end
+        end
+        for _,entry in ipairs(sessionEvents) do
+            local row=Instance.new("TextLabel")
+            row.BackgroundTransparency=1; row.Size=UDim2.new(1,0,0,18); row.Font=Enum.Font.Gotham; row.TextColor3=colors.subtle; row.TextSize=13; row.TextXAlignment=Enum.TextXAlignment.Left; row.Text=entry; row.Parent=timelineBox
+        end
+    end
+    pushSessionEvent("Session started")
+    updateTimeline()
     makeButton(p,"Universal Features",function() switchTab("Movement"); ripple(tabButtons["Movement"]) end)
     makeButton(p,"Game-Specific Features",function() switchTab("Script Hub"); ripple(tabButtons["Script Hub"]) end)
     makeButton(p,"Configs",function() switchTab("Configs"); ripple(tabButtons["Configs"]) end)
@@ -463,7 +875,44 @@ do
     makeSlider(p,"Fly Speed",10,250,config.flySpeed,function(v) config.flySpeed=v end)
     makeToggle(p,"Sprint (hold Shift)",function(on) sprinting=on end)
     makeSlider(p,"Sprint Speed",20,200,config.sprintSpeed,function(v) config.sprintSpeed=v end)
+    addDivider(p)
     makeToggle(p,"Speed Lock",function(on) config.speedLock=on end, config.speedLock)
+    local islandNote=Instance.new("TextLabel"); islandNote.BackgroundTransparency=1; islandNote.Size=UDim2.new(1,-10,0,32); islandNote.Font=Enum.Font.Gotham; islandNote.TextColor3=colors.subtle; islandNote.TextSize=13; islandNote.TextXAlignment=Enum.TextXAlignment.Left; islandNote.Text="Island Teleport: auto-detects island models and saved spots"; islandNote.Parent=p
+    local islandOptions={"Rescan islands"}
+    local selectedIsland = islandOptions[1]
+    local islandDropdown = makeDropdown(p,"Island Destination", islandOptions, function(v) selectedIsland=v end)
+    local function syncIslandOptions()
+        local names={}
+        for _,spot in ipairs(islandSpots) do table.insert(names, spot.name) end
+        if #names==0 then table.insert(names, "No islands found") end
+        for k in pairs(islandOptions) do islandOptions[k]=nil end
+        for i,v in ipairs(names) do islandOptions[i]=v end
+        selectedIsland = islandOptions[1]
+        islandDropdown(selectedIsland)
+    end
+    makeButton(p,"Rescan Islands",function()
+        refreshIslands()
+        syncIslandOptions()
+        toast("Islands refreshed")
+    end)
+    makeButton(p,"Teleport to Island",function()
+        if not selectedIsland or selectedIsland=="No islands found" then toast("No island to teleport") return end
+        for _,spot in ipairs(islandSpots) do
+            if spot.name == selectedIsland and spot.pos then
+                if HRP then
+                    HRP.CFrame = CFrame.new(spot.pos + Vector3.new(0,6,0))
+                    pushSessionEvent("Teleported to "..spot.name)
+                    toast("Teleported to "..spot.name)
+                else
+                    toast("No character root")
+                end
+                return
+            end
+        end
+        toast("Island not found in list")
+    end)
+    refreshIslands()
+    syncIslandOptions()
     makeToggle(p,"Noclip",function(on) noclipEnabled=on end)
     makeToggle(p,"Infinite Jump",function(on) infiniteJump=on end)
     makeToggle(p,"Safe-Walk",function(on) safeWalkEnabled=on end)
@@ -483,11 +932,36 @@ do
     makeToggle(p,"ESP Healthbar",function(on) config.esp.healthbar=on end,config.esp.healthbar)
     makeToggle(p,"ESP Team Colors",function(on) config.esp.teamColors=on; clearESP(); if config.esp.enabled then for _,pl in ipairs(Players:GetPlayers()) do addESP(pl) end end end,config.esp.teamColors)
     makeDropdown(p,"ESP Color Preset",{"Blue","Red","Green","Purple","Gold"},applyEspPreset)
+    addDivider(p)
+    local colorBox=Instance.new("Frame"); colorBox.Size=UDim2.new(1,-10,0,70); colorBox.BackgroundColor3=colors.panel; colorBox.BorderSizePixel=0; makeCorner(colorBox,10); colorBox.Parent=p
+    local grid=Instance.new("UIGridLayout",colorBox); grid.CellSize=UDim2.new(0.24,0,0,30); grid.CellPadding=UDim2.new(0,6,0,6); grid.FillDirection=Enum.FillDirection.Horizontal
+    local function colorInput(label, key)
+        local tb=Instance.new("TextBox"); tb.BackgroundColor3=colors.bg; tb.BorderSizePixel=0; tb.TextColor3=colors.text; tb.Font=Enum.Font.Gotham; tb.TextSize=13; tb.PlaceholderText=label.." (R,G,B)"; tb.Text=formatColor(config.esp.colors[key]); makeCorner(tb,8); tb.Parent=colorBox; return tb
+    end
+    local accentBox=colorInput("Accent","accent")
+    local outlineBox=colorInput("Outline","outline")
+    local boxBox=colorInput("Box","box")
+    local tracerBox=colorInput("Tracer","tracer")
+    makeButton(p,"Apply ESP Colors",function()
+        local acc, out, bx, tr = parseColor(accentBox.Text), parseColor(outlineBox.Text), parseColor(boxBox.Text), parseColor(tracerBox.Text)
+        if acc and out and bx and tr then
+            config.esp.colors = {accent=acc, outline=out, box=bx, tracer=tr, preset="Custom"}
+            clearESP(); if config.esp.enabled then for _,pl in ipairs(Players:GetPlayers()) do addESP(pl) end end
+            toast("Applied custom ESP colors")
+        else
+            toast("Invalid color values")
+        end
+    end)
     makeSlider(p,"Box Thickness",1,6,config.esp.thicknessBox or 2,function(v) config.esp.thicknessBox=v; clearESP(); if config.esp.enabled then for _,pl in ipairs(Players:GetPlayers()) do addESP(pl) end end end)
     makeSlider(p,"Tracer Thickness",1,6,config.esp.thicknessTracer or 2,function(v) config.esp.thicknessTracer=v; clearESP(); if config.esp.enabled then for _,pl in ipairs(Players:GetPlayers()) do addESP(pl) end end end)
     makeSlider(p,"ESP Opacity",0.2,1,config.esp.opacity or 0.6,function(v) config.esp.opacity=v; clearESP(); if config.esp.enabled then for _,pl in ipairs(Players:GetPlayers()) do addESP(pl) end end end)
+    addDivider(p)
     local filterBox=Instance.new("TextBox"); filterBox.Size=UDim2.new(1,-10,0,36); filterBox.BackgroundColor3=colors.bg; filterBox.TextColor3=colors.text; filterBox.PlaceholderText="World ESP name filter (comma separated)"; filterBox.Text=config.esp.nameFilter or ""; filterBox.BorderSizePixel=0; filterBox.Font=Enum.Font.Gotham; filterBox.TextSize=14; makeCorner(filterBox,8); filterBox.Parent=p
     filterBox.FocusLost:Connect(function() config.esp.nameFilter=filterBox.Text end)
+    makeButton(p,"Rescan world tags",function()
+        if worldEspState.tags then addWorldTagESP(worldEspState.tags, worldEspState.fill, worldEspState.outline); toast("World tags rescanned") else toast("No world tags active") end
+    end)
+    makeSlider(p,"World ESP rescan (s)",0,10,config.worldScanInterval or 0,function(v) config.worldScanInterval=v end)
     makeSlider(p,"Camera FOV",40,120,config.fov,function(v) config.fov=v; camera.FieldOfView=v end)
     makeToggle(p,"Fullbright",function(on) config.fullbright=on; if on then Lighting.Brightness=2; Lighting.Ambient=Color3.new(1,1,1); Lighting.OutdoorAmbient=Color3.new(1,1,1) else Lighting.Brightness=1; Lighting.Ambient=Color3.new(0,0,0); Lighting.OutdoorAmbient=Color3.new(0,0,0) end end,false)
     makeToggle(p,"No Fog",function(on) config.noFog=on; if on then Lighting.FogEnd=1e9 else Lighting.FogEnd=1000 end end,false)
@@ -545,6 +1019,16 @@ do
     makeToggle(p,"Anti-AFK",function(on) config.antiAfk=on end)
     makeButton(p,"Start Generic Auto-Collect",function() toast("Generic auto-collect stub"); config.autoCollect=true end)
     makeButton(p,"Stop Generic Auto-Collect",function() config.autoCollect=false end)
+    addDivider(p)
+    if isFisch or isFishIt then
+        buildFishAutomation(p)
+    else
+        local note=Instance.new("TextLabel"); note.BackgroundTransparency=1; note.Size=UDim2.new(1,-10,0,36); note.Font=Enum.Font.Gotham; note.TextColor3=colors.subtle; note.TextSize=14; note.TextXAlignment=Enum.TextXAlignment.Left; note.TextWrapped=true; note.Text="Fish It automation appears here when you join Fisch/Fish It."; note.Parent=p
+    end
+    if isForge then
+        addDivider(p)
+        buildForgePlanner(p)
+    end
 end
 
 -- Player List
@@ -588,37 +1072,9 @@ do
             pushLog("Auto-exec set for "..currentGameId)
         end
     end)
-    local gameNameLower = string.lower(game.Name or "")
-    local isFisch = game.PlaceId==16732694052 or gameNameLower:find("fisch")
-    local isFishIt = gameNameLower:find("fish it") ~= nil
-    local isForge = gameNameLower:find("forge") ~= nil
-    -- per-game modules with tag filters
-    local function addWorldTagESP(tagList, fill, outline)
-        clearWorldESP()
-        for _,d in ipairs(workspace:GetDescendants()) do
-            if d:IsA("BasePart") then
-                for _,tag in ipairs(tagList) do
-                    if d.Name:lower():find(tag) then
-                        local h=Instance.new("Highlight"); h.FillColor=fill; h.OutlineColor=outline; h.Adornee=d; h.Parent=d; table.insert(worldHighlights,h)
-                        break
-                    end
-                end
-            end
-        end
-    end
-
     if isFisch or isFishIt then
-        local fishFilter=Instance.new("TextBox"); fishFilter.Size=UDim2.new(1,-10,0,30); fishFilter.BackgroundColor3=colors.bg; fishFilter.TextColor3=colors.text; fishFilter.Text="fish,hotspot"; fishFilter.PlaceholderText="Tags: fish,hotspot"; fishFilter.BorderSizePixel=0; fishFilter.Font=Enum.Font.Gotham; fishFilter.TextSize=14; makeCorner(fishFilter,8); fishFilter.Parent=p
-        makeToggle(p,"Fishing: Auto Interact (reel)",function(on) config.autoInteractFilter="reel"; autoInteractEnabled=on end)
-        makeToggle(p,"Fishing: ESP (fish/hotspots)",function(on)
-            if on then
-                local tags={}
-                for t in string.gmatch(string.lower(fishFilter.Text), "([^,]+)") do table.insert(tags, t:match("^%s*(.-)%s*$")) end
-                addWorldTagESP(tags, Color3.fromRGB(60,200,255), Color3.fromRGB(10,120,200))
-            else
-                clearWorldESP()
-            end
-        end)
+        local fishNote=Instance.new("TextLabel"); fishNote.BackgroundTransparency=1; fishNote.Size=UDim2.new(1,-10,0,40); fishNote.Font=Enum.Font.Gotham; fishNote.TextColor3=colors.text; fishNote.TextSize=14; fishNote.TextWrapped=true; fishNote.TextXAlignment=Enum.TextXAlignment.Left; fishNote.TextYAlignment=Enum.TextYAlignment.Top; fishNote.Text="Fish It controls moved to Automation tab for a full-page layout."; fishNote.Parent=p
+        makeButton(p,"Open Fish Automation",function() switchTab("Automation") end)
     end
     if isForge then
         local forgeFilter=Instance.new("TextBox"); forgeFilter.Size=UDim2.new(1,-10,0,30); forgeFilter.BackgroundColor3=colors.bg; forgeFilter.TextColor3=colors.text; forgeFilter.Text="ore,anvil,forge,smelt"; forgeFilter.PlaceholderText="Tags: ore,anvil,forge"; forgeFilter.BorderSizePixel=0; forgeFilter.Font=Enum.Font.Gotham; forgeFilter.TextSize=14; makeCorner(forgeFilter,8); forgeFilter.Parent=p
@@ -632,6 +1088,9 @@ do
             end
         end)
         makeToggle(p,"Forge: Auto Interact prompts",function(on) config.autoInteractFilter="forge,smelt,anvil"; autoInteractEnabled=on end)
+        makeToggle(p,"Auto insert ores",function(on) config.forge.autoInsert=on end, config.forge.autoInsert)
+        makeToggle(p,"Auto collect ingots",function(on) config.forge.autoCollect=on end, config.forge.autoCollect)
+        makeSlider(p,"Anvil timing tolerance",0,0.5,config.forge.anvilTolerance or 0.18,function(v) config.forge.anvilTolerance=v end)
     end
 end
 
@@ -645,6 +1104,7 @@ do
         config.lastConfig = name
         pushLog("Saved "..name)
     end)
+    addDivider(p)
     local configList = listConfigs()
     local selectedConfig = configList[1]
     makeDropdown(p,"Load Config",configList,function(v) selectedConfig=v end)
@@ -676,10 +1136,32 @@ do
             toast("Select a config first")
         end
     end)
+    addDivider(p)
+    local recentBox=Instance.new("Frame"); recentBox.Size=UDim2.new(1,-10,0,90); recentBox.BackgroundColor3=colors.panel; recentBox.BorderSizePixel=0; makeCorner(recentBox,10); recentBox.Parent=p
+    local recentPad=Instance.new("UIPadding",recentBox); recentPad.PaddingTop=UDim.new(0,8); recentPad.PaddingBottom=UDim.new(0,8); recentPad.PaddingLeft=UDim.new(0,10); recentPad.PaddingRight=UDim.new(0,10)
+    local recentTitle=Instance.new("TextLabel"); recentTitle.BackgroundTransparency=1; recentTitle.Size=UDim2.new(1,0,0,18); recentTitle.Font=Enum.Font.GothamSemibold; recentTitle.TextColor3=colors.text; recentTitle.TextSize=14; recentTitle.TextXAlignment=Enum.TextXAlignment.Left; recentTitle.Text="Recent Configs"; recentTitle.Parent=recentBox
+    local recList=Instance.new("UIListLayout", recentBox); recList.FillDirection=Enum.FillDirection.Vertical; recList.Padding=UDim.new(0,6)
+    local function renderRecent()
+        for _,child in ipairs(recentBox:GetChildren()) do
+            if child:IsA("TextButton") then child:Destroy() end
+        end
+        for i,name in ipairs(config.recentConfigs) do
+            if i>3 then break end
+            local b=Instance.new("TextButton"); b.Size=UDim2.new(1,0,0,24); b.BackgroundColor3=colors.bg; b.BorderSizePixel=0; b.TextColor3=colors.text; b.Font=Enum.Font.Gotham; b.TextSize=13; b.Text=("Load %s"):format(name); makeCorner(b,8); b.Parent=recentBox
+            b.MouseButton1Click:Connect(function()
+                loadConfigFromFile(name)
+                config.lastConfig = name
+                pushLog("Loaded "..name)
+            end)
+        end
+    end
+    renderRecent()
+    addDivider(p)
     makeDropdown(p,"Theme",{"Christmas","Midnight","NeoGreen","Amber","Purple"},function(v) config.theme=v; applyTheme() end)
-    makeButton(p,"Apply Preset: Legit",function() local t=config.presets.legit; config.wsBoost=t.ws; config.jpBoost=t.jp; camera.FieldOfView=t.fov; config.aimbotEnabled=t.aimbot; config.esp.enabled=t.esp; config.lastPreset="Legit"; toast("Legit preset applied") end)
-    makeButton(p,"Apply Preset: Rage",function() local t=config.presets.rage; config.wsBoost=t.ws; config.jpBoost=t.jp; camera.FieldOfView=t.fov; config.aimbotEnabled=t.aimbot; config.esp.enabled=t.esp; config.lastPreset="Rage"; toast("Rage preset applied") end)
-    makeButton(p,"Apply Preset: Visuals",function() local t=config.presets.visuals; camera.FieldOfView=t.fov; config.aimbotEnabled=t.aimbot; config.esp.enabled=t.esp; config.lastPreset="Visuals"; toast("Visuals preset applied") end)
+    makeButton(p,"Apply Preset: Legit",function() local t=config.presets.legit; config.wsBoost=t.ws; config.jpBoost=t.jp; camera.FieldOfView=t.fov; config.aimbotEnabled=t.aimbot; config.esp.enabled=t.esp; config.lastPreset="Legit"; toast("Legit preset applied"); pushSessionEvent("Preset: Legit") end)
+    makeButton(p,"Apply Preset: Rage",function() local t=config.presets.rage; config.wsBoost=t.ws; config.jpBoost=t.jp; camera.FieldOfView=t.fov; config.aimbotEnabled=t.aimbot; config.esp.enabled=t.esp; config.lastPreset="Rage"; toast("Rage preset applied"); pushSessionEvent("Preset: Rage") end)
+    makeButton(p,"Apply Preset: Visuals",function() local t=config.presets.visuals; camera.FieldOfView=t.fov; config.aimbotEnabled=t.aimbot; config.esp.enabled=t.esp; config.lastPreset="Visuals"; toast("Visuals preset applied"); pushSessionEvent("Preset: Visuals") end)
+    addDivider(p)
     makeButton(p,"Set Auto-Load (Global)",function() saveConfigToFile("AutoLoad_Global") end)
     makeButton(p,"Set Auto-Load (This Game)",function() saveConfigToFile("AutoLoad_"..tostring(currentGameId)) end)
     makeButton(p,"List Saved Configs (console)",function()
@@ -691,6 +1173,44 @@ do
             toast("listfiles not available")
         end
     end)
+    local recentFrame=Instance.new("Frame"); recentFrame.Size=UDim2.new(1,-10,0,70); recentFrame.BackgroundColor3=colors.panel; recentFrame.BorderSizePixel=0; makeCorner(recentFrame,10); recentFrame.Parent=p
+    local rfList=Instance.new("UIListLayout",recentFrame); rfList.FillDirection=Enum.FillDirection.Horizontal; rfList.Padding=UDim.new(0,6); rfList.VerticalAlignment=Enum.VerticalAlignment.Center; rfList.HorizontalAlignment=Enum.HorizontalAlignment.Center
+    local function refreshRecent()
+        for _,c in ipairs(recentFrame:GetChildren()) do if c:IsA("TextButton") then c:Destroy() end end
+        for i,name in ipairs(config.recentConfigs) do
+            local b=Instance.new("TextButton"); b.Size=UDim2.fromOffset(120,28); b.BackgroundColor3=colors.bg; b.BorderSizePixel=0; b.TextColor3=colors.text; b.Font=Enum.Font.Gotham; b.TextSize=13; b.Text=name; makeCorner(b,8); b.Parent=recentFrame
+            b.MouseButton1Click:Connect(function()
+                loadConfigFromFile(name)
+                config.lastConfig = name
+                pushLog("Quick-loaded "..name)
+            end)
+        end
+    end
+    refreshRecent()
+    local kbFrame=Instance.new("Frame"); kbFrame.Size=UDim2.new(1,-10,0,140); kbFrame.BackgroundColor3=colors.panel; kbFrame.BorderSizePixel=0; makeCorner(kbFrame,10); kbFrame.Parent=p
+    local kbList=Instance.new("UIListLayout",kbFrame); kbList.Padding=UDim.new(0,6); kbList.FillDirection=Enum.FillDirection.Vertical; kbList.HorizontalAlignment=Enum.HorizontalAlignment.Left
+    local function addKeybindRow(label, keyPath)
+        local row=Instance.new("Frame"); row.Size=UDim2.new(1,-12,0,26); row.BackgroundTransparency=1; row.Parent=kbFrame
+        local l=Instance.new("TextLabel"); l.BackgroundTransparency=1; l.Size=UDim2.new(0.5,0,1,0); l.Font=Enum.Font.Gotham; l.TextColor3=colors.text; l.TextSize=13; l.TextXAlignment=Enum.TextXAlignment.Left; l.Text=label; l.Parent=row
+        local b=Instance.new("TextButton"); b.Size=UDim2.new(0.5,-4,1,0); b.Position=UDim2.new(0.5,4,0,0); b.BackgroundColor3=colors.bg; b.BorderSizePixel=0; b.TextColor3=colors.text; b.Font=Enum.Font.GothamSemibold; b.TextSize=13; b.Text=tostring(keyPath()); makeCorner(b,8); b.Parent=row
+        b.MouseButton1Click:Connect(function()
+            b.Text = "Press key..."
+            local conn; conn = UserInputService.InputBegan:Connect(function(inp)
+                if inp.UserInputType == Enum.UserInputType.Keyboard then
+                    conn:Disconnect()
+                    b.Text = tostring(inp.KeyCode)
+                    keyPath(inp.KeyCode)
+                end
+            end)
+        end)
+    end
+    addKeybindRow("Toggle UI", function(k) if k then config.menuKey=k end return config.menuKey end)
+    addKeybindRow("Soft Panic", function(k) if k then config.panicKey=k end return config.panicKey end)
+    addKeybindRow("Toggle Aimbot", function(k) if k then config.keybinds.toggleAimbot=k end return config.keybinds.toggleAimbot end)
+    addKeybindRow("Toggle ESP", function(k) if k then config.keybinds.toggleESP=k end return config.keybinds.toggleESP end)
+    addKeybindRow("Toggle Fly", function(k) if k then config.keybinds.toggleFly=k end return config.keybinds.toggleFly end)
+    addKeybindRow("Toggle Noclip", function(k) if k then config.keybinds.toggleNoclip=k end return config.keybinds.toggleNoclip end)
+    addKeybindRow("Toggle Overlay", function(k) if k then config.overlayToggleKey=k end return config.overlayToggleKey end)
 end
 
 -- Protection
@@ -721,6 +1241,7 @@ do
         if g then g.Enabled=not on end
     end, config.solidTheme)
     makeToggle(p,"Disable in VIP/Private",function(on) config.disableInVIP=on end, config.disableInVIP)
+    addDivider(p)
     local box=Instance.new("TextBox"); box.Size=UDim2.new(1,-10,0,36); box.BackgroundColor3=colors.bg; box.TextColor3=colors.text; box.PlaceholderText="Username to whitelist"; box.Text=""; box.BorderSizePixel=0; box.Font=Enum.Font.Gotham; box.TextSize=14; makeCorner(box,8); box.Parent=p
     makeButton(p,"Add to Whitelist",function()
         if box.Text and box.Text~="" then table.insert(config.friendWhitelist, box.Text); pushLog("Whitelisted "..box.Text); box.Text="" end
@@ -731,14 +1252,48 @@ end
 -- UI / Theme
 do
     local p=pages["UI / Theme"]
-    makeDropdown(p,"Theme",{"Christmas","Midnight","NeoGreen","Amber","Purple"},function(v) config.theme=v; applyTheme() end)
+    makeDropdown(p,"Theme",{"Christmas","Midnight","NeoGreen","Amber","Purple"},function(v) config.theme=v; applyTheme(); pushSessionEvent("Theme: "..v) end)
+    local themeGrid=Instance.new("Frame"); themeGrid.Size=UDim2.new(1,-10,0,92); themeGrid.BackgroundColor3=colors.panel; themeGrid.BorderSizePixel=0; makeCorner(themeGrid,10); themeGrid.Parent=p
+    local gridPad=Instance.new("UIPadding",themeGrid); gridPad.PaddingTop=UDim.new(0,8); gridPad.PaddingBottom=UDim.new(0,8); gridPad.PaddingLeft=UDim.new(0,10); gridPad.PaddingRight=UDim.new(0,10)
+    local swatchLayout=Instance.new("UIGridLayout",themeGrid); swatchLayout.CellSize=UDim2.new(0.31,0,0,36); swatchLayout.CellPadding=UDim2.new(0,8,0,8)
+    for name,pal in pairs(themes) do
+        local swatch=Instance.new("TextButton")
+        swatch.Text=name
+        swatch.Size=UDim2.new(0,120,0,30)
+        swatch.BackgroundColor3=pal.panel
+        swatch.TextColor3=pal.text
+        swatch.Font=Enum.Font.GothamSemibold
+        swatch.TextSize=13
+        swatch.BorderSizePixel=0
+        makeCorner(swatch,8)
+        local stripe=Instance.new("Frame"); stripe.Size=UDim2.new(1,0,0,4); stripe.Position=UDim2.new(0,0,1,-4); stripe.BackgroundColor3=pal.accent; stripe.BorderSizePixel=0; stripe.Parent=swatch; makeCorner(stripe,4)
+        swatch.MouseEnter:Connect(function() tween(swatch,0.12,{BackgroundColor3=pal.bg}) end)
+        swatch.MouseLeave:Connect(function() tween(swatch,0.12,{BackgroundColor3=pal.panel}) end)
+        swatch.MouseButton1Click:Connect(function()
+            config.theme=name; applyTheme(); pushSessionEvent("Theme: "..name); toast("Applied "..name.." theme")
+        end)
+        swatch.Parent=themeGrid
+    end
     makeSlider(p,"Menu Opacity",0.5,1,config.uiOpacity,function(v) config.uiOpacity=v; applyOpacity(main) end)
     makeSlider(p,"Menu Width",520,820,mainWidth,function(v) setMainSize(v, mainHeight) end)
     makeSlider(p,"Menu Height",360,640,mainHeight,function(v) setMainSize(mainWidth, v) end)
     makeSlider(p,"Blur Strength",0,15,config.blurSize,function(v) config.blurSize=v; if config.uiBlur then setBlur(true, v) end end)
+    local comfortRow=Instance.new("Frame"); comfortRow.Size=UDim2.new(1,-10,0,70); comfortRow.BackgroundColor3=colors.panel; comfortRow.BorderSizePixel=0; makeCorner(comfortRow,10); comfortRow.Parent=p
+    local comfortLayout=Instance.new("UIListLayout",comfortRow); comfortLayout.FillDirection=Enum.FillDirection.Horizontal; comfortLayout.Padding=UDim.new(0,8)
+    comfortLayout.HorizontalAlignment=Enum.HorizontalAlignment.Center
+    local function comfortBtn(label,preset)
+        local b=Instance.new("TextButton"); b.Size=UDim2.new(0.32,0,0,50); b.BackgroundColor3=colors.bg; b.BorderSizePixel=0; b.TextColor3=colors.text; b.Font=Enum.Font.GothamSemibold; b.TextSize=13; b.Text=label; makeCorner(b,10); b.Parent=comfortRow
+        b.MouseButton1Click:Connect(function()
+            config.uiOpacity=preset.opacity; config.uiBlur=preset.blur; config.blurSize=preset.blurSize; applyOpacity(main); setBlur(config.uiBlur, config.blurSize); pushSessionEvent("Comfort: "..label)
+        end)
+    end
+    comfortBtn("Performance",{opacity=1,blur=false,blurSize=0})
+    comfortBtn("Balanced",{opacity=0.9,blur=true,blurSize=6})
+    comfortBtn("Cinematic",{opacity=0.8,blur=true,blurSize=12})
     makeToggle(p,"Compact Layout",function(on) config.compact=on; toast("Reopen UI to apply compact spacing") end, config.compact)
     makeToggle(p,"UI Animations",function(on) config.animations=on end,true)
     makeToggle(p,"UI Sounds",function(on) config.uiSounds=on end,false)
+    addDivider(p)
     makeButton(p,"Apply Fisch/Fish It Visuals",function()
         config.gamePreset="FischVisual"
         config.autoInteractFilter="reel"
@@ -757,6 +1312,21 @@ end
 -- Overlay HUD + Quick Bar
 local overlay = Instance.new("Frame"); overlay.Size=UDim2.new(0,220,0,24); overlay.Position=UDim2.new(0,8,0,8); overlay.BackgroundColor3=Color3.fromRGB(0,0,0); overlay.BackgroundTransparency=0.35; overlay.BorderSizePixel=0; overlay.Parent=gui; makeCorner(overlay,8); makeDraggable(overlay)
 local overlayLabel=Instance.new("TextLabel"); overlayLabel.BackgroundTransparency=1; overlayLabel.Size=UDim2.new(1,-10,1,0); overlayLabel.Position=UDim2.new(0,6,0,0); overlayLabel.Font=Enum.Font.GothamSemibold; overlayLabel.TextColor3=Color3.new(1,1,1); overlayLabel.TextSize=13; overlayLabel.TextXAlignment=Enum.TextXAlignment.Left; overlayLabel.Parent=overlay
+local function applyOverlayDock(pos)
+    config.overlayDock = pos or config.overlayDock
+    if pos=="TR" then overlay.Position=UDim2.new(1,-overlay.Size.X.Offset-8,0,8)
+    elseif pos=="BL" then overlay.Position=UDim2.new(0,8,1,-overlay.Size.Y.Offset-8)
+    elseif pos=="BR" then overlay.Position=UDim2.new(1,-overlay.Size.X.Offset-8,1,-overlay.Size.Y.Offset-8)
+    else overlay.Position=UDim2.new(0,8,0,8) end
+end
+applyOverlayDock(config.overlayDock or "TL")
+local dockBar=Instance.new("Frame"); dockBar.Size=UDim2.new(0,100,0,18); dockBar.Position=UDim2.new(1,-110,1,-22); dockBar.BackgroundTransparency=1; dockBar.Parent=overlay
+local dockList=Instance.new("UIListLayout", dockBar); dockList.FillDirection=Enum.FillDirection.Horizontal; dockList.Padding=UDim.new(0,4); dockList.HorizontalAlignment=Enum.HorizontalAlignment.Right
+local function dockButton(label,key)
+    local b=Instance.new("TextButton"); b.Size=UDim2.fromOffset(22,18); b.BackgroundColor3=Color3.fromRGB(30,30,30); b.BorderSizePixel=0; b.TextColor3=Color3.new(1,1,1); b.TextSize=12; b.Font=Enum.Font.GothamSemibold; b.Text=label; makeCorner(b,6); b.Parent=dockBar
+    b.MouseButton1Click:Connect(function() applyOverlayDock(key) end)
+end
+dockButton("TL","TL"); dockButton("TR","TR"); dockButton("BL","BL"); dockButton("BR","BR")
 
 local quickBar = Instance.new("Frame"); quickBar.Size=UDim2.new(0,260,0,32); quickBar.Position=UDim2.new(1,-280,1,-48); quickBar.BackgroundColor3=Color3.fromRGB(0,0,0); quickBar.BackgroundTransparency=0.35; quickBar.BorderSizePixel=0; quickBar.Parent=gui; makeCorner(quickBar,10); makeDraggable(quickBar); quickBar.Visible=config.showQuickbar
 local qList=Instance.new("UIListLayout",quickBar); qList.FillDirection=Enum.FillDirection.Horizontal; qList.Padding=UDim.new(0,6); qList.VerticalAlignment=Enum.VerticalAlignment.Center; qList.HorizontalAlignment=Enum.HorizontalAlignment.Center
@@ -778,13 +1348,16 @@ UserInputService.InputBegan:Connect(function(input,gp)
     if gp then return end
     if input.KeyCode == config.menuKey then
         hidden = not hidden
-        tween(main, 0.22, {Position = hidden and UDim2.new(0.5, -320, 1.1, 0) or UDim2.new(0.5, -320, 0.5, -240)})
+        if config.animations then
+            tween(main, 0.22, {Position = hidden and UDim2.new(0.5, -320, 1.1, 0) or UDim2.new(0.5, -320, 0.5, -240)})
+        else
+            main.Position = hidden and UDim2.new(0.5, -320, 1.1, 0) or UDim2.new(0.5, -320, 0.5, -240)
+        end
         main.Active = not hidden
         gui.Enabled = not hidden
         fovCircle.Visible = config.aimbotEnabled and not hidden
     elseif input.KeyCode == config.panicKey then
-        clearESP(); gui:Destroy(); offscreenGui:Destroy(); setBlur(false)
-        Hum.WalkSpeed = wsDefault; Hum.JumpPower = jpDefault; workspace.Gravity=gravityDefault
+        softPanic()
     elseif input.KeyCode == config.keybinds.toggleAimbot then config.aimbotEnabled=not config.aimbotEnabled; fovCircle.Visible=config.aimbotEnabled
     elseif input.KeyCode == config.keybinds.toggleESP then config.esp.enabled=not config.esp.enabled; clearESP(); if config.esp.enabled then for _,pl in ipairs(Players:GetPlayers()) do addESP(pl) end end
     elseif input.KeyCode == config.keybinds.toggleFly then flyEnabled=not flyEnabled
@@ -895,6 +1468,17 @@ end)
 
 task.spawn(function()
     while true do
+        if worldEspState.tags and config.worldScanInterval and config.worldScanInterval > 0 then
+            addWorldTagESP(worldEspState.tags, worldEspState.fill or colors.accent, worldEspState.outline or colors.accent2)
+            task.wait(config.worldScanInterval)
+        else
+            task.wait(1)
+        end
+    end
+end)
+
+task.spawn(function()
+    while true do
         if config.antiAfk then VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Right, false, nil); VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Right, false, nil) end
         task.wait(30)
     end
@@ -917,10 +1501,14 @@ end))
 -- Float anim
 task.spawn(function()
     while gui.Parent do
-        tween(main,1.6,{Position=UDim2.new(main.Position.X.Scale,main.Position.X.Offset,main.Position.Y.Scale,main.Position.Y.Offset+4)},Enum.EasingStyle.Sine,Enum.EasingDirection.InOut)
-        task.wait(1.6)
-        tween(main,1.6,{Position=UDim2.new(main.Position.X.Scale,main.Position.X.Offset,main.Position.Y.Scale,main.Position.Y.Offset-4)},Enum.EasingStyle.Sine,Enum.EasingDirection.InOut)
-        task.wait(1.6)
+        if config.animations then
+            tween(main,1.6,{Position=UDim2.new(main.Position.X.Scale,main.Position.X.Offset,main.Position.Y.Scale,main.Position.Y.Offset+4)},Enum.EasingStyle.Sine,Enum.EasingDirection.InOut)
+            task.wait(1.6)
+            tween(main,1.6,{Position=UDim2.new(main.Position.X.Scale,main.Position.X.Offset,main.Position.Y.Scale,main.Position.Y.Offset-4)},Enum.EasingStyle.Sine,Enum.EasingDirection.InOut)
+            task.wait(1.6)
+        else
+            task.wait(1)
+        end
     end
 end)
 
