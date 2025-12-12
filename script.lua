@@ -1624,6 +1624,50 @@ end)
 
 task.spawn(function()
     while true do
+        if worldEspState.tags and config.worldScanInterval and config.worldScanInterval > 0 then
+            addWorldTagESP(worldEspState.tags, worldEspState.fill or colors.accent, worldEspState.outline or colors.accent2)
+            task.wait(config.worldScanInterval)
+        else
+            task.wait(1)
+        end
+    end
+end)
+
+task.spawn(function()
+    while true do
+        if worldEspState.tags and config.worldScanInterval and config.worldScanInterval > 0 then
+            addWorldTagESP(worldEspState.tags, worldEspState.fill or colors.accent, worldEspState.outline or colors.accent2)
+            task.wait(config.worldScanInterval)
+        else
+            task.wait(1)
+        end
+    end
+end)
+
+task.spawn(function()
+    while true do
+        if worldEspState.tags and config.worldScanInterval and config.worldScanInterval > 0 then
+            addWorldTagESP(worldEspState.tags, worldEspState.fill or colors.accent, worldEspState.outline or colors.accent2)
+            task.wait(config.worldScanInterval)
+        else
+            task.wait(1)
+        end
+    end
+end)
+
+task.spawn(function()
+    while true do
+        if worldEspState.tags and config.worldScanInterval and config.worldScanInterval > 0 then
+            addWorldTagESP(worldEspState.tags, worldEspState.fill or colors.accent, worldEspState.outline or colors.accent2)
+            task.wait(config.worldScanInterval)
+        else
+            task.wait(1)
+        end
+    end
+end)
+
+task.spawn(function()
+    while true do
         if config.antiAfk then VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Right, false, nil); VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Right, false, nil) end
         task.wait(30)
     end
