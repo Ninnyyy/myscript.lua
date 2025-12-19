@@ -21,13 +21,14 @@ local camera = workspace.CurrentCamera
 
 -- Themes
 local themes = {
+    BrandDark = {bg=Color3.fromRGB(8,10,14), panel=Color3.fromRGB(18,22,30), accent=Color3.fromRGB(35,110,190), accent2=Color3.fromRGB(20,80,140), text=Color3.fromRGB(220,230,245), subtle=Color3.fromRGB(110,120,140), success=Color3.fromRGB(70,180,140), warn=Color3.fromRGB(230,170,80), danger=Color3.fromRGB(235,80,90)},
     Midnight = {bg=Color3.fromRGB(14,16,22), panel=Color3.fromRGB(22,28,40), accent=Color3.fromRGB(0,145,255), accent2=Color3.fromRGB(0,110,200), text=Color3.fromRGB(230,238,255), subtle=Color3.fromRGB(110,130,160), success=Color3.fromRGB(70,210,140), warn=Color3.fromRGB(255,195,90), danger=Color3.fromRGB(255,80,90)},
     NeoGreen = {bg=Color3.fromRGB(12,16,12), panel=Color3.fromRGB(24,32,28), accent=Color3.fromRGB(0,200,140), accent2=Color3.fromRGB(0,150,100), text=Color3.fromRGB(220,245,230), subtle=Color3.fromRGB(90,130,110), success=Color3.fromRGB(60,220,140), warn=Color3.fromRGB(240,190,80), danger=Color3.fromRGB(255,80,80)},
     Amber    = {bg=Color3.fromRGB(24,18,12), panel=Color3.fromRGB(34,26,18), accent=Color3.fromRGB(255,170,80), accent2=Color3.fromRGB(220,135,60), text=Color3.fromRGB(255,240,220), subtle=Color3.fromRGB(150,110,80), success=Color3.fromRGB(60,220,140), warn=Color3.fromRGB(255,200,120), danger=Color3.fromRGB(255,90,90)},
     Purple   = {bg=Color3.fromRGB(18,12,26), panel=Color3.fromRGB(30,20,44), accent=Color3.fromRGB(170,110,255), accent2=Color3.fromRGB(130,80,210), text=Color3.fromRGB(235,225,255), subtle=Color3.fromRGB(140,110,170), success=Color3.fromRGB(90,220,160), warn=Color3.fromRGB(250,190,120), danger=Color3.fromRGB(255,90,130)},
     Christmas = {bg=Color3.fromRGB(14,18,16), panel=Color3.fromRGB(22,28,24), accent=Color3.fromRGB(200,30,30), accent2=Color3.fromRGB(30,160,60), text=Color3.fromRGB(240,235,220), subtle=Color3.fromRGB(140,170,150), success=Color3.fromRGB(60,200,110), warn=Color3.fromRGB(255,210,110), danger=Color3.fromRGB(255,80,90)},
 }
-local colors = themes.Christmas
+local colors = themes.BrandDark
 
 -- Config
 local config = {
@@ -66,7 +67,7 @@ local config = {
         {name="High Point", pos=Vector3.new(0,50,0)},
     },
     webhookUrl = "",
-    theme = "Christmas",
+    theme = "BrandDark",
     keybinds = {toggleUI=Enum.KeyCode.L, panic=Enum.KeyCode.RightControl, toggleAimbot=Enum.KeyCode.F1, toggleESP=Enum.KeyCode.F2, toggleFly=Enum.KeyCode.F3, toggleNoclip=Enum.KeyCode.F4},
     presets = {
         legit   = {ws=24, jp=70, fov=75, aimbot=false, esp=true},
@@ -105,10 +106,10 @@ local config = {
     recentConfigs = {},
     keySystem = {
         enabled = true,
-        validKeys = {"ADV-DEMO-123", "ADV-FRIEND-777"},
+        validKeys = {"0QQD293DF48X4VV381!Ninny.dll", "D93N2FKJ2456FE2SDN!Extesy.dll"},
         verifyEndpoint = "",
-        websiteUrl = "https://example.com/get-key",
-        discordUrl = "https://discord.gg/example",
+        websiteUrl = "https://ninny.top/get-key",
+        discordUrl = "https://discord.gg/C48ghn5AZX",
         lastKey = "",
     },
 
@@ -337,6 +338,28 @@ local function tween(obj,time,props,style,dir)
     end
     return TweenService:Create(obj,TweenInfo.new(time,style or Enum.EasingStyle.Quint,dir or Enum.EasingDirection.Out),props)
 end
+local function animateGradient(grad, duration, offsetA, offsetB, rotA, rotB)
+    if not grad then return end
+    local dur = duration or 6
+    local oa = offsetA or Vector2.new(-0.2, -0.2)
+    local ob = offsetB or Vector2.new(0.2, 0.2)
+    local ra = rotA or 20
+    local rb = rotB or 65
+    task.spawn(function()
+        while grad.Parent do
+            if config and config.animations==false then
+                grad.Offset = oa
+                grad.Rotation = ra
+                task.wait(1)
+            else
+                tween(grad, dur, {Offset=ob, Rotation=rb}, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut):Play()
+                task.wait(dur)
+                tween(grad, dur, {Offset=oa, Rotation=ra}, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut):Play()
+                task.wait(dur)
+            end
+        end
+    end)
+end
 local function ripple(button)
     local r=Instance.new("Frame"); r.BackgroundColor3=colors.accent; r.BackgroundTransparency=0.4; r.Size=UDim2.fromOffset(0,0)
     r.AnchorPoint=Vector2.new(0.5,0.5); r.Position=UDim2.new(0.5,0,0.5,0); r.BorderSizePixel=0; r.ZIndex=5; r.Parent=button
@@ -509,14 +532,27 @@ local function stylizeCard(frame)
     frame.BackgroundColor3=colors.panel:lerp(Color3.new(1,1,1),0.05)
     frame.BackgroundTransparency=0.08
     local stroke=Instance.new("UIStroke",frame); stroke.Thickness=1; stroke.Transparency=0.6; stroke.Color=colors.subtle
-    local g=Instance.new("UIGradient",frame); g.Rotation=90; g.Color=ColorSequence.new({ColorSequenceKeypoint.new(0, colors.bg:lerp(colors.accent2,0.08)), ColorSequenceKeypoint.new(1, colors.panel)})
+    local g=Instance.new("UIGradient",frame); g.Rotation=90; g.Offset=Vector2.new(0,0); g.Color=ColorSequence.new({ColorSequenceKeypoint.new(0, colors.bg:lerp(colors.accent2,0.08)), ColorSequenceKeypoint.new(1, colors.panel)})
     addHoverScale(frame)
     frame.MouseEnter:Connect(function()
         tween(stroke,0.14,{Transparency=0.2}):Play()
+        tween(g,0.18,{Offset=Vector2.new(0.12,0)}):Play()
     end)
     frame.MouseLeave:Connect(function()
         tween(stroke,0.14,{Transparency=0.6}):Play()
+        tween(g,0.18,{Offset=Vector2.new(0,0)}):Play()
     end)
+end
+
+local function addButtonGradient(btn, base, accent)
+    local g=Instance.new("UIGradient", btn)
+    g.Rotation=90
+    g.Offset=Vector2.new(0,0)
+    g.Color=ColorSequence.new({
+        ColorSequenceKeypoint.new(0, base),
+        ColorSequenceKeypoint.new(1, accent),
+    })
+    return g
 end
 
 local function makeToggle(parent,label,cb,defaultState)
@@ -524,6 +560,7 @@ local function makeToggle(parent,label,cb,defaultState)
     local f=Instance.new("Frame"); f.Size=UDim2.new(1,-10,0,h); f.BorderSizePixel=0; makeCorner(f,12); f.Parent=parent; stylizeCard(f)
     local l=Instance.new("TextLabel"); l.BackgroundTransparency=1; l.Size=UDim2.new(1,-90,1,0); l.Position=UDim2.new(0,12,0,0); l.Font=Enum.Font.Gotham; l.TextColor3=colors.text; l.TextSize=15; l.TextXAlignment=Enum.TextXAlignment.Left; l.Text=label; l.Parent=f
     local btn=Instance.new("TextButton"); btn.Size=UDim2.fromOffset(70,config.compact and 22 or 24); btn.Position=UDim2.new(1,-80,0.5,-(config.compact and 11 or 12)); btn.BackgroundColor3=colors.bg:lerp(colors.accent,0.06); btn.BackgroundTransparency=0.12; btn.BorderSizePixel=0; btn.AutoButtonColor=false; btn.Text="Off"; btn.TextColor3=colors.text; btn.Font=Enum.Font.GothamSemibold; btn.TextSize=13; makeCorner(btn,12); btn.Parent=f
+    local btnGrad = addButtonGradient(btn, colors.bg:lerp(colors.accent2,0.05), colors.panel:lerp(colors.accent2,0.12))
     local knob=Instance.new("Frame"); knob.Size=UDim2.fromOffset(20,20); knob.Position=UDim2.new(0,2,0.5,-10); knob.BackgroundColor3=colors.subtle; knob.BorderSizePixel=0; makeCorner(knob,20); knob.Parent=btn
     local on=defaultState or false
     local function set(state)
@@ -531,6 +568,10 @@ local function makeToggle(parent,label,cb,defaultState)
         btn.Text = on and "On" or "Off"
         tween(btn,0.16,{BackgroundColor3=on and colors.accent or colors.bg:lerp(colors.accent2,0.06)})
         tween(knob,0.16,{Position=on and UDim2.new(1,-22,0.5,-10) or UDim2.new(0,2,0.5,-10), BackgroundColor3=on and Color3.new(1,1,1) or colors.subtle})
+        btnGrad.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, on and colors.accent2 or colors.bg:lerp(colors.accent2,0.05)),
+            ColorSequenceKeypoint.new(1, on and colors.accent or colors.panel:lerp(colors.accent2,0.12)),
+        })
         pushLog(string.format("%s: %s", label, on and "On" or "Off"))
         if cb then task.spawn(function() cb(on) end) end
     end
@@ -541,8 +582,11 @@ end
 local function makeButton(parent,label,cb)
     local b=Instance.new("TextButton"); b.Size=UDim2.new(1,-10,0,40); b.BorderSizePixel=0; b.AutoButtonColor=false
     b.Font=Enum.Font.GothamSemibold; b.TextColor3=colors.text; b.TextSize=15; b.Text=label; makeCorner(b,10); b.Parent=parent; stylizeCard(b)
+    local g = addButtonGradient(b, colors.panel:lerp(colors.bg,0.2), colors.panel:lerp(colors.accent2,0.12))
     b.MouseEnter:Connect(function() tween(b,0.1,{BackgroundTransparency=0, BackgroundColor3=colors.panel:lerp(colors.accent2,0.12)}) end)
     b.MouseLeave:Connect(function() tween(b,0.12,{BackgroundTransparency=0.08, BackgroundColor3=colors.panel:lerp(Color3.new(1,1,1),0.05)}) end)
+    b.MouseEnter:Connect(function() tween(g,0.18,{Offset=Vector2.new(0.12,0)}):Play() end)
+    b.MouseLeave:Connect(function() tween(g,0.18,{Offset=Vector2.new(0,0)}):Play() end)
     b.MouseButton1Click:Connect(function() ripple(b); if cb then task.spawn(cb) end end)
     return b
 end
@@ -568,7 +612,10 @@ local function makeDropdown(parent,label,options,cb,defaultVal)
     local f=Instance.new("Frame"); f.Size=UDim2.new(1,-10,0,40); f.BorderSizePixel=0; makeCorner(f,12); f.Parent=parent; stylizeCard(f)
     local l=Instance.new("TextLabel"); l.BackgroundTransparency=1; l.Size=UDim2.new(0.5,-10,1,0); l.Position=UDim2.new(0,12,0,0); l.Font=Enum.Font.Gotham; l.TextColor3=colors.text; l.TextSize=15; l.TextXAlignment=Enum.TextXAlignment.Left; l.Text=label; l.Parent=f
     local btn=Instance.new("TextButton"); btn.Size=UDim2.new(0.5,-20,1,-8); btn.Position=UDim2.new(0.5,8,0,4); btn.BackgroundColor3=colors.bg:lerp(colors.accent2,0.08); btn.BackgroundTransparency=0.1; btn.BorderSizePixel=0; btn.TextColor3=colors.text; btn.Font=Enum.Font.GothamSemibold; btn.TextSize=14; btn.Text=options[1] or "Select"; makeCorner(btn,8); btn.Parent=f
+    local g = addButtonGradient(btn, colors.bg:lerp(colors.accent2,0.05), colors.panel:lerp(colors.accent2,0.12))
     local function set(val) btn.Text=val; if cb then cb(val) end end
+    btn.MouseEnter:Connect(function() tween(g,0.18,{Offset=Vector2.new(0.12,0)}):Play() end)
+    btn.MouseLeave:Connect(function() tween(g,0.18,{Offset=Vector2.new(0,0)}):Play() end)
     btn.MouseButton1Click:Connect(function() ripple(btn); local next=1; for i,opt in ipairs(options) do if opt==btn.Text then next=i%#options+1 end end; set(options[next]) end)
     set(defaultVal or options[1]); return set
 end
@@ -1057,14 +1104,15 @@ end
 -- GUI root
 local gui = Instance.new("ScreenGui"); gui.Name="AdvancedMenu"; gui.ResetOnSpawn=false; gui.Parent=game:GetService("CoreGui")
 
--- Christmas glass backdrop
+-- Brand glass backdrop
 setBlur(config.uiBlur ~= false, config.blurSize or 10)
 local backdrop = Instance.new("Frame"); backdrop.Size=UDim2.new(1,0,1,0); backdrop.Position=UDim2.new(0,0,0,0); backdrop.BackgroundColor3=colors.bg; backdrop.BackgroundTransparency=0.2; backdrop.BorderSizePixel=0; backdrop.ZIndex=0; backdrop.Parent=gui
 local bgGrad = Instance.new("UIGradient", backdrop); bgGrad.Rotation=35; bgGrad.Color = ColorSequence.new({
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(255,120,120)),
-    ColorSequenceKeypoint.new(0.48, Color3.fromRGB(40,26,22)),
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(46,96,64)),
+    ColorSequenceKeypoint.new(0, colors.bg),
+    ColorSequenceKeypoint.new(0.5, colors.panel:lerp(colors.accent2,0.2)),
+    ColorSequenceKeypoint.new(1, colors.bg:lerp(colors.accent,0.12)),
 })
+animateGradient(bgGrad, 10, Vector2.new(-0.2,-0.12), Vector2.new(0.2,0.12), 20, 60)
 local vignette = Instance.new("Frame"); vignette.Size=UDim2.new(1,0,1,0); vignette.BackgroundColor3=Color3.new(0,0,0); vignette.BackgroundTransparency=0.65; vignette.BorderSizePixel=0; vignette.ZIndex=0; vignette.Parent=gui
 local vigGrad = Instance.new("UIGradient", vignette); vigGrad.Color = ColorSequence.new({
     ColorSequenceKeypoint.new(0, Color3.fromRGB(0,0,0)),
@@ -1080,6 +1128,7 @@ local mainWidth, mainHeight = config.menuW or 640, config.menuH or 480
 local shadow = Instance.new("ImageLabel"); shadow.Image = "rbxassetid://1316045217"; shadow.ImageColor3 = Color3.fromRGB(0,0,0); shadow.ImageTransparency=0.65; shadow.ScaleType=Enum.ScaleType.Slice; shadow.SliceCenter=Rect.new(10,10,118,118); shadow.Size=UDim2.fromOffset(mainWidth+32, mainHeight+32); shadow.Position=UDim2.new(0.5,-(mainWidth+32)/2,0.5,-(mainHeight+32)/2); shadow.BackgroundTransparency=1; shadow.ZIndex=0; shadow.Parent=gui
 local main = Instance.new("Frame"); main.Size=UDim2.fromOffset(mainWidth, mainHeight); main.Position=UDim2.new(0.5,-mainWidth/2,0.5,-mainHeight/2); main.BackgroundColor3=colors.bg:lerp(Color3.new(1,1,1),0.04); main.BackgroundTransparency=0.12; main.BorderSizePixel=0; main.Active=true; main.Draggable=true; main.Parent=gui; makeCorner(main,16)
 local glassStroke = Instance.new("UIStroke", main); glassStroke.Thickness = 1.4; glassStroke.Transparency = 0.35; glassStroke.Color = colors.accent; local glassGrad = Instance.new("UIGradient", glassStroke); glassGrad.Color = ColorSequence.new({ColorSequenceKeypoint.new(0, colors.accent2), ColorSequenceKeypoint.new(1, colors.accent)})
+animateGradient(glassGrad, 8, Vector2.new(-0.1,0), Vector2.new(0.1,0), 80, 110)
 local function setMainSize(w,h)
     mainWidth, mainHeight = w,h
     config.menuW, config.menuH = w,h
@@ -1092,7 +1141,8 @@ end
 local function addDivider(parent)
     local d=Instance.new("Frame"); d.Size=UDim2.new(1,-10,0,1); d.BackgroundColor3=colors.subtle; d.BackgroundTransparency=0.8; d.BorderSizePixel=0; d.Parent=parent; return d
 end
-local grad=Instance.new("UIGradient",main); grad.Color=ColorSequence.new{ColorSequenceKeypoint.new(0,colors.bg),ColorSequenceKeypoint.new(1,colors.accent2)}; grad.Rotation=60
+local grad=Instance.new("UIGradient",main); grad.Color=ColorSequence.new{ColorSequenceKeypoint.new(0,colors.panel),ColorSequenceKeypoint.new(1,colors.bg:lerp(colors.accent2,0.2))}; grad.Rotation=60
+animateGradient(grad, 9, Vector2.new(-0.12,0), Vector2.new(0.12,0), 40, 75)
 local grip = Instance.new("Frame"); grip.Size=UDim2.fromOffset(14,14); grip.Position=UDim2.new(1,-18,1,-18); grip.BackgroundColor3=colors.panel; grip.BorderSizePixel=0; makeCorner(grip,4); grip.Parent=main
 makeDraggable(grip, function(delta)
     setMainSize(math.clamp(mainWidth + delta.X, 520, 900), math.clamp(mainHeight + delta.Y, 360, 720))
@@ -1105,14 +1155,14 @@ end
 -- Title
 local titleHeight = 48
 local title=Instance.new("Frame"); title.Size=UDim2.new(1,0,0,titleHeight); title.BackgroundColor3=colors.panel:lerp(colors.accent,0.08); title.BorderSizePixel=0; title.Parent=main; makeCorner(title,12)
-local titleLabel=Instance.new("TextLabel"); titleLabel.Size=UDim2.new(1,-170,1,0); titleLabel.Position=UDim2.new(0,18,0,6); titleLabel.BackgroundTransparency=1; titleLabel.Font=Enum.Font.GothamBold; titleLabel.Text="Ninnydll Premium 🎄"; titleLabel.TextColor3=Color3.fromRGB(255,215,120); titleLabel.TextSize=18; titleLabel.TextXAlignment=Enum.TextXAlignment.Left; titleLabel.Parent=title
+local titleLabel=Instance.new("TextLabel"); titleLabel.Size=UDim2.new(1,-170,1,0); titleLabel.Position=UDim2.new(0,18,0,6); titleLabel.BackgroundTransparency=1; titleLabel.Font=Enum.Font.GothamBold; titleLabel.Text="Ninnydll Premium"; titleLabel.TextColor3=colors.text; titleLabel.TextSize=18; titleLabel.TextXAlignment=Enum.TextXAlignment.Left; titleLabel.Parent=title
 task.spawn(function()
-    local gold1 = Color3.fromRGB(255,215,120)
-    local gold2 = Color3.fromRGB(255,235,170)
+    local glowA = colors.accent
+    local glowB = colors.accent2
     while titleLabel.Parent do
-        tween(titleLabel,0.8,{TextColor3=gold2}):Play()
+        tween(titleLabel,0.8,{TextColor3=glowB}):Play()
         task.wait(0.8)
-        tween(titleLabel,0.8,{TextColor3=gold1}):Play()
+        tween(titleLabel,0.8,{TextColor3=glowA}):Play()
         task.wait(0.8)
     end
 end)
@@ -1128,6 +1178,7 @@ local function pushSessionEvent(msg)
     if updateTimeline then updateTimeline() end
 end
 local underline=Instance.new("Frame"); underline.Size=UDim2.new(1,-16,0,1); underline.Position=UDim2.new(0,8,1,-1); underline.BackgroundColor3=colors.accent; underline.BorderSizePixel=0; underline.Parent=title; local underlineGrad=Instance.new("UIGradient", underline); underlineGrad.Color = ColorSequence.new({ColorSequenceKeypoint.new(0, colors.accent2), ColorSequenceKeypoint.new(1, colors.accent)})
+animateGradient(underlineGrad, 6, Vector2.new(-0.2,0), Vector2.new(0.2,0), 0, 0)
 
 -- Status bar
 local statusHeight = 26
