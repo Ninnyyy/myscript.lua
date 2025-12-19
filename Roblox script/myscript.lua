@@ -1184,7 +1184,9 @@ local function switchTab(name)
         pageFader.BackgroundTransparency=1
         pageFader.Visible=true
         tween(pageFader,0.12,{BackgroundTransparency=0.35}):Play()
-        tween(pageFader,0.18,{BackgroundTransparency=1}):Completed:Connect(function() pageFader.Visible=false end)
+        local fadeOut = tween(pageFader,0.18,{BackgroundTransparency=1})
+        fadeOut:Play()
+        fadeOut.Completed:Connect(function() pageFader.Visible=false end)
     end)
 end
 local function createTabButton(name)
