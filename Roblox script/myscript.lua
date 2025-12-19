@@ -50,16 +50,6 @@ local config = {
         thicknessBox = 2,
         thicknessTracer = 2,
         nameFilter = "",
-        palette = "Blue",
-        fadeEnabled = false,
-        fadeStart = 150,
-        fadeEnd = 500,
-        outlineOnly = false,
-        arrowSize = 12,
-        arrowStyle = "Rounded",
-        nameSize = 14,
-        healthbarPos = "Bottom",
-        maxDistance = 0,
     },
     flySpeed = 75,
     wsBoost = 28,
@@ -96,13 +86,6 @@ local config = {
     disableInVIP = false,
     aimbotSkipFriends = true,
     aimbotLegitDecay = false,
-    aimbotProfiles = {
-        Legit = {smooth=0.28, fov=90, trigger=false, silent=false, area="Head"},
-        Balanced = {smooth=0.18, fov=140, trigger=false, silent=false, area="Torso"},
-        Rage = {smooth=0.05, fov=220, trigger=true, silent=false, area="Head"},
-        Custom = {smooth=0.18, fov=140, trigger=false, silent=false, area="Head"},
-    },
-    lastAimbotProfile = "",
     overlayToggleKey = Enum.KeyCode.F6,
     solidTheme = false,
     snow = false,
@@ -120,24 +103,13 @@ local config = {
     worldScanInterval = 3,
     overlayDock = "TL",
     recentConfigs = {},
-    autoLoadGameProfile = true,
-    lastGameProfile = "",
-    gameTeleports = {},
-    advanced = {
-        legitMode = false,
-        rageMode = false,
-        freezeMode = "None",
-        autoMine = false,
-        autoMineInterval = 0.6,
-        autoMineTags = "ore,mine,rock,crystal",
-        autoKill = false,
-        autoKillInterval = 0.25,
-        autoKillRange = 60,
-        autoKillPlayers = false,
-        autoKillNPCs = true,
-        autoEquipRod = false,
-        autoEquipInterval = 2,
-        rodPriority = "rod,fish",
+    keySystem = {
+        enabled = true,
+        validKeys = {"ADV-DEMO-123", "ADV-FRIEND-777"},
+        verifyEndpoint = "",
+        websiteUrl = "https://example.com/get-key",
+        discordUrl = "https://discord.gg/example",
+        lastKey = "",
     },
 
     -- Generated mega-feature tracker keeps a record of the 1000 micro-features and improvements shown in the dashboard preview
@@ -184,6 +156,11 @@ local config = {
         tpUpgrade="Upgrade Station",
         tpBait="Bait Vendor",
         savedWaypoint="Favorite 1",
+        rarityFilter="Common,Uncommon,Rare",
+        valueFilter=0,
+        whitelist="",
+        blacklist="",
+        mode="Money",
         xpMode=false,
         moneyMode=true,
         autoSellFull=true,
@@ -204,10 +181,14 @@ local config = {
         fov=80,
         overlayMode="Money/hour",
         eventOnly=false,
+        eventAlerts=true,
         tpEventOnStart=true,
+        hotspotWaypoints={"Hotspot 1","Hotspot 2","Hotspot 3"},
         antiAfk=true,
+        rejoinMode="None",
         rejoinLowPop=false,
         profile="Ocean Farm",
+        miniHud=true,
     },
     fischPro = {
         mode="Always complete",
@@ -219,12 +200,14 @@ local config = {
         region="Ocean",
         routePreset="Snowcap cave route",
         conditionPreset="Foggy night mythic",
+        conditionMode="Auto-best",
         autoSwitchTime=true,
         autoSwitchWeather=true,
         loadout="Deep ocean mythic",
         baitRule="Don’t waste rare bait",
         boatRoute="Harbor loop",
         bestiaryFocus="Mythic",
+        bestiaryMissing=true,
         hotspotEsp=true,
         landmarkEsp=true,
         mythicMarker=true,
@@ -238,6 +221,7 @@ local config = {
         rejoinMode="None",
         overlayProfile="Session",
         theme="Nautical",
+        sessionHud=true,
     },
     forgePlanner = {
         tab="Home",
@@ -246,61 +230,18 @@ local config = {
         oreGoal=1000,
         recipeTag="DPS",
         weaponProfile="Fire greatsword",
+        weaponCompare="Crit dual blades",
         armorProfile="Goblin Cave tank set",
+        armorCompare="Volcanic Depths survival",
         runePage="DPS page",
+        runeTarget="Tank page",
         zoneRoute="Recommended order",
+        progressionPreset="Quest-first",
         economyMode="Sell vs Forge",
+        goalType="Gold/hour",
         overlay=true,
     },
     forge = {autoInsert=true, autoCollect=true, anvilTolerance=0.18},
-    forgeAdvanced = {
-        autoMelt=false,
-        autoPour=false,
-        autoHammer=false,
-        openForge=false,
-        autoAttackMobs=false,
-        multiMobSelection=true,
-        attackDistance=60,
-        depthControl=false,
-        depthOffset=0,
-        autoNoClip=false,
-        autoMineRocks=false,
-        rockTypeSelection="Ore,Crystal,Rock",
-        areaFilter="",
-        playerAvoidance=true,
-        miningDistance=50,
-        autoSellWeapons=false,
-        autoSellOres=false,
-        sellQuantityLimit=0,
-        autoSellOnFull=false,
-        timedAutoSell=false,
-        sellInterval=45,
-        shopInit=false,
-        buyPotions=false,
-        autoDrinkPotions=false,
-        autoBuyWhenEmpty=false,
-        potionTypes="Health,Stamina",
-        npcTeleportTarget="",
-        placeTeleportTarget="",
-        pickaxeShopTarget="",
-        islandTeleportTarget="",
-        autoRerollRace=false,
-        targetRace="",
-        showRaceChances=false,
-        claimAllOres=false,
-        claimAllEnemies=false,
-        claimAllEquipment=false,
-        claimAll=false,
-        rareItemNotify=false,
-        rarityFilter="Rare,Legendary,Mythic",
-        webhookUrl="",
-        chanceFilter=0,
-        worldHopMode="None",
-        lowPingPriority=false,
-        playerCountFilter=0,
-        autoExecOnTeleport=false,
-        redeemCodes="",
-    },
 }
 
 -- Massive feature manifest to showcase breadth (auto-generated for lightweight tracking and preview)
@@ -346,32 +287,19 @@ end
 local hidden = false
 
 -- State
-local scriptActive = true
 local wsDefault = Hum.WalkSpeed
 local jpDefault = Hum.JumpPower
 local gravityDefault = workspace.Gravity
 local connections = {}
-local humanoidDiedConn
 local highlightObjects, nametagObjects, arrowObjects, tracerObjects = {}, {}, {}, {}
 local worldHighlights = {}
 local blurEffect
 local sessionEvents = {}
 local updateTimeline
-local fovCircle
-local pushLog = function() end
-local lastTargetName, lastTargetDist, stickyTarget = nil, nil, nil
-local overlayUpdateRate = 0.2
-local lastOverlayUpdate = 0
-local proximityPrompts = {}
-local lastInteractFilter = ""
-local cachedInteractTags = {}
-local depthLockY = nil
 local gameNameLower = string.lower(game.Name or "")
 local fishItIds = {15557967605, 17180310686}
 local fischIds = {16732694052}
 local forgeIds = {22442260156}
-local rivalsIds = {}
-local inkIds = {}
 local function anyMatch(ids, names)
     for _,id in ipairs(ids) do if game.PlaceId == id then return true end end
     for _,name in ipairs(names) do if gameNameLower:find(name, 1, true) then return true end end
@@ -380,9 +308,7 @@ end
 local isFisch = anyMatch(fischIds, {"fisch"})
 local isFishIt = anyMatch(fishItIds, {"fish it", "fishit"})
 local isForge = anyMatch(forgeIds, {"the forge", "forge"})
-local isRivals = anyMatch(rivalsIds, {"rivals"})
-local isInk = anyMatch(inkIds, {"ink game", "inkgame"})
-local detectedGame = isFisch and "Fisch" or isFishIt and "Fish It" or isForge and "Forge" or isRivals and "Rivals" or isInk and "Ink Game" or "Other"
+local detectedGame = isFisch and "Fisch" or isFishIt and "Fish It" or isForge and "Forge" or "Other"
 local flyEnabled, flyBV = false, nil
 local islandSpots = {}
 local noclipEnabled = false
@@ -397,12 +323,6 @@ local offscreenGui = Instance.new("ScreenGui")
 offscreenGui.Name = "OffscreenGui"
 offscreenGui.ResetOnSpawn = false
 offscreenGui.Parent = game:GetService("CoreGui")
-table.insert(connections, workspace.DescendantAdded:Connect(function(desc)
-    if not isForge or not config.forgeAdvanced.rareItemNotify then return end
-    if desc:IsA("Tool") or desc:IsA("Model") then
-        notifyRareItem(desc.Name)
-    end
-end))
 
 -- Utility
 local function makeCorner(obj,r) local c=Instance.new("UICorner"); c.CornerRadius=UDim.new(0,r or 10); c.Parent=obj end
@@ -511,11 +431,8 @@ local function softPanic()
     noclipEnabled=false
     autoClickEnabled=false
     autoInteractEnabled=false
-    stickyTarget = nil
-    lastTargetName, lastTargetDist = nil, nil
     clearESP(); clearWorldESP()
-    if Hum then Hum.WalkSpeed=wsDefault; Hum.JumpPower=jpDefault end
-    workspace.Gravity=gravityDefault
+    Hum.WalkSpeed=wsDefault; Hum.JumpPower=jpDefault; workspace.Gravity=gravityDefault
     pushLog("Soft panic: disabled toggles")
     toast("Soft panic: toggles disabled")
 end
@@ -532,259 +449,6 @@ local function applyOpacity(guiObj)
         end
     end
 end
-local function registerGameTeleports(list)
-    if not list then return end
-    local seen = {}
-    for _,name in ipairs(config.gameTeleports) do seen[string.lower(name)] = true end
-    for _,name in ipairs(list) do
-        if name and name ~= "" then
-            local key = string.lower(name)
-            if not seen[key] then
-                table.insert(config.gameTeleports, name)
-                seen[key] = true
-            end
-        end
-    end
-end
-local function parseTags(text)
-    local tags = {}
-    for t in string.gmatch(string.lower(text or ""), "([^,]+)") do
-        local clean = t:match("^%s*(.-)%s*$")
-        if clean ~= "" then table.insert(tags, clean) end
-    end
-    return tags
-end
-local function isPlayerCharacter(model)
-    if not model or not model:IsA("Model") then return false end
-    for _,plr in ipairs(Players:GetPlayers()) do
-        if plr.Character == model then return true end
-    end
-    return false
-end
-local function findNearestTarget(range, allowPlayers, allowNPCs)
-    local best, bestDist = nil, math.huge
-    local maxRange = range or 60
-    if allowPlayers then
-        for _,plr in ipairs(Players:GetPlayers()) do
-            if plr ~= LP and plr.Character then
-                local hrp = plr.Character:FindFirstChild("HumanoidRootPart")
-                local hum = plr.Character:FindFirstChildOfClass("Humanoid")
-                if hrp and hum and hum.Health > 0 then
-                    local dist = (hrp.Position - HRP.Position).Magnitude
-                    if dist <= maxRange and dist < bestDist then
-                        best, bestDist = hrp, dist
-                    end
-                end
-            end
-        end
-    end
-    if allowNPCs then
-        for _,obj in ipairs(workspace:GetDescendants()) do
-            if obj:IsA("Humanoid") and obj.Health > 0 then
-                local model = obj.Parent
-                if model and model:IsA("Model") and not isPlayerCharacter(model) then
-                    local hrp = model:FindFirstChild("HumanoidRootPart")
-                    if hrp then
-                        local dist = (hrp.Position - HRP.Position).Magnitude
-                        if dist <= maxRange and dist < bestDist then
-                            best, bestDist = hrp, dist
-                        end
-                    end
-                end
-            end
-        end
-    end
-    return best
-end
-local function equipToolByPriority(priorityText)
-    if not Hum then return false end
-    local tags = parseTags(priorityText)
-    local backpack = LP:FindFirstChildOfClass("Backpack")
-    if not backpack then return false end
-    for _,tool in ipairs(backpack:GetChildren()) do
-        if tool:IsA("Tool") then
-            local name = string.lower(tool.Name)
-            for _,tag in ipairs(tags) do
-                if name:find(tag, 1, true) then
-                    Hum:EquipTool(tool)
-                    return true
-                end
-            end
-        end
-    end
-    return false
-end
-local function isPlayerNearby(radius)
-    local hrp = HRP
-    if not hrp then return false end
-    for _,plr in ipairs(Players:GetPlayers()) do
-        if plr ~= LP and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
-            local dist = (plr.Character.HumanoidRootPart.Position - hrp.Position).Magnitude
-            if dist <= radius then return true end
-        end
-    end
-    return false
-end
-local function notifyRareItem(name)
-    if not config.forgeAdvanced.rareItemNotify then return end
-    local filters = parseTags(config.forgeAdvanced.rarityFilter)
-    local lower = string.lower(name or "")
-    for _,tag in ipairs(filters) do
-        if lower:find(tag, 1, true) then
-            toast("Rare item: "..name)
-            if config.forgeAdvanced.webhookUrl and config.forgeAdvanced.webhookUrl ~= "" then
-                log("RareItem", name)
-            end
-            break
-        end
-    end
-end
-local function findSpotByName(name)
-    if not name or name == "" then return nil end
-    local needle = string.lower(name)
-    local bestPos, bestDist = nil, math.huge
-    for _,obj in ipairs(workspace:GetDescendants()) do
-        local objName = string.lower(obj.Name or "")
-        if objName:find(needle, 1, true) then
-            local pos
-            if obj:IsA("BasePart") then
-                pos = obj.Position
-            elseif obj:IsA("Model") then
-                if obj.PrimaryPart then
-                    pos = obj.PrimaryPart.Position
-                else
-                    local cf = obj:GetBoundingBox()
-                    pos = cf.Position
-                end
-            end
-            if pos then
-                local dist = HRP and (pos - HRP.Position).Magnitude or 0
-                if dist < bestDist then
-                    bestDist = dist
-                    bestPos = pos
-                end
-            end
-        end
-    end
-    return bestPos
-end
-local function teleportToSpot(name)
-    if not HRP then return false end
-    local pos = findSpotByName(name)
-    if pos then
-        HRP.CFrame = CFrame.new(pos + Vector3.new(0,6,0))
-        return true
-    end
-    return false
-end
-local function ensureModuleDir()
-    if not makefolder or not isfolder then return end
-    if not isfolder("modules") then makefolder("modules") end
-    if not isfolder("modules/games") then makefolder("modules/games") end
-end
-local function requireModule(relPath)
-    if not readfile or not loadstring then return nil end
-    local ok, src = pcall(function() return readfile(relPath) end)
-    if not ok or not src then return nil end
-    local chunk, err = loadstring(src)
-    if not chunk then
-        warn("Module load failed:", relPath, err)
-        return nil
-    end
-    local okRun, mod = pcall(chunk)
-    if okRun then return mod end
-    warn("Module exec failed:", relPath, mod)
-    return nil
-end
-local function updateInteractTags()
-    local filter = string.lower(config.autoInteractFilter or "")
-    if filter == lastInteractFilter then return end
-    lastInteractFilter = filter
-    cachedInteractTags = {}
-    for tag in string.gmatch(filter, "([^,]+)") do
-        tag = tag:match("^%s*(.-)%s*$")
-        if tag ~= "" then table.insert(cachedInteractTags, tag) end
-    end
-end
-local function trackPrompt(prompt)
-    if prompt and prompt:IsA("ProximityPrompt") then
-        proximityPrompts[prompt] = true
-    end
-end
-local function promptPos(prompt)
-    if not prompt then return nil end
-    local parent = prompt.Parent
-    if parent and parent:IsA("BasePart") then return parent.Position end
-    if parent and parent:IsA("Model") then
-        if parent.PrimaryPart then return parent.PrimaryPart.Position end
-        local cf = parent:GetBoundingBox()
-        return cf.Position
-    end
-    return nil
-end
-local function firePromptsByTags(tags, maxDist)
-    if not tags or #tags == 0 then return end
-    local hrp = HRP
-    local maxD = maxDist or 0
-    for prompt in pairs(proximityPrompts) do
-        if prompt.Enabled and prompt.Parent then
-            local name = string.lower(prompt.Name or "")
-            for _,tag in ipairs(tags) do
-                if name:find(tag, 1, true) then
-                    if maxD > 0 and hrp then
-                        local pos = promptPos(prompt)
-                        if pos and (pos - hrp.Position).Magnitude > maxD then break end
-                    end
-                    pcall(function() fireproximityprompt(prompt) end)
-                    break
-                end
-            end
-        end
-    end
-end
-local function untrackPrompt(prompt)
-    if prompt then proximityPrompts[prompt] = nil end
-end
-local function initPromptTracking()
-    for _,desc in ipairs(workspace:GetDescendants()) do
-        if desc:IsA("ProximityPrompt") then trackPrompt(desc) end
-    end
-    table.insert(connections, workspace.DescendantAdded:Connect(function(desc)
-        if desc:IsA("ProximityPrompt") then trackPrompt(desc) end
-    end))
-    table.insert(connections, workspace.DescendantRemoving:Connect(function(desc)
-        if desc:IsA("ProximityPrompt") then untrackPrompt(desc) end
-    end))
-end
-local function disconnectAll()
-    for _,conn in ipairs(connections) do
-        pcall(function() conn:Disconnect() end)
-    end
-    connections = {}
-end
-local function shutdown(reason)
-    if not scriptActive then return end
-    scriptActive = false
-    disconnectAll()
-    stickyTarget = nil
-    lastTargetName, lastTargetDist = nil, nil
-    pcall(function() clearESP() end)
-    pcall(function() clearWorldESP() end)
-    if flyBV then flyBV:Destroy(); flyBV=nil end
-    if gui then gui:Destroy() end
-    if offscreenGui then offscreenGui:Destroy() end
-    setBlur(false)
-    if Hum then Hum.WalkSpeed=wsDefault; Hum.JumpPower=jpDefault end
-    workspace.Gravity=gravityDefault
-    pushLog("Shutdown ("..(reason or "manual")..")")
-end
-local function bindHumanoid(hum)
-    if humanoidDiedConn then pcall(function() humanoidDiedConn:Disconnect() end) end
-    humanoidDiedConn = hum.Died:Connect(function()
-        if config.autoDisableOnTP then autoDisable("death") end
-    end)
-    table.insert(connections, humanoidDiedConn)
-end
 
 -- Config IO
 local function loadConfigFromString(str)
@@ -793,18 +457,6 @@ local function loadConfigFromString(str)
     toast("Failed to load config"); return false
 end
 local function ensureDir() pcall(function() if not isfolder("ADVHub") then makefolder("ADVHub") end end) end
-local function ensureGameProfileDir()
-    ensureDir()
-    pcall(function()
-        if not isfolder("ADVHub/GameProfiles") then makefolder("ADVHub/GameProfiles") end
-    end)
-end
-local function gameProfilePath(name)
-    return "ADVHub/GameProfiles/"..tostring(currentGameId).."_"..name..".json"
-end
-local function gameProfileAutoPath()
-    return "ADVHub/GameProfiles/Auto_"..tostring(currentGameId)..".txt"
-end
 local function saveConfigToFile(name)
     ensureDir()
     local path="ADVHub/"..name..".json"
@@ -829,17 +481,6 @@ local function loadConfigFromFile(name)
 end
 local function autoLoadConfig()
     ensureDir()
-    ensureGameProfileDir()
-    local loadedGameProfile = false
-    if config.autoLoadGameProfile and isfile and isfile(gameProfileAutoPath()) then
-        local ok,name=pcall(function() return readfile(gameProfileAutoPath()) end)
-        if ok and name and name ~= "" then
-            loadGameProfile(name)
-            toast("Auto-loaded game profile "..name)
-            loadedGameProfile = true
-        end
-    end
-    if loadedGameProfile then return end
     local perGame="ADVHub/AutoLoad_"..tostring(currentGameId)..".json"
     local global="ADVHub/AutoLoad_Global.json"
     local target=nil
@@ -861,72 +502,6 @@ local function listConfigs()
     table.sort(files)
     if #files==0 then table.insert(files,"None") end
     return files
-end
-
-local function listGameProfiles()
-    local files = {}
-    if listfiles and isfolder and isfolder("ADVHub/GameProfiles") then
-        for _,f in ipairs(listfiles("ADVHub/GameProfiles")) do
-            local name = f:match("ADVHub[/\\]GameProfiles[/\\]"..tostring(currentGameId).."_([^/\\]+)%.json$")
-            if name then table.insert(files, name) end
-        end
-    end
-    table.sort(files)
-    if #files==0 then table.insert(files,"None") end
-    return files
-end
-
-local function saveGameProfile(name)
-    if not name or name == "" then return end
-    ensureGameProfileDir()
-    local path = gameProfilePath(name)
-    local ok,err=pcall(function() writefile(path, HttpService:JSONEncode(config)) end)
-    toast(ok and ("Saved "..path) or ("Save failed: "..tostring(err)))
-    if ok then
-        config.lastGameProfile = name
-        pushSessionEvent("Saved game profile "..name)
-    end
-end
-
-local function loadGameProfile(name)
-    if not name or name == "" then return end
-    local path = gameProfilePath(name)
-    local ok,content=pcall(function() return readfile(path) end)
-    if ok then
-        loadConfigFromString(content)
-        toast("Loaded "..path)
-        config.lastGameProfile = name
-        pushSessionEvent("Loaded game profile "..name)
-    else
-        toast("Load failed")
-    end
-end
-
-local function deleteGameProfile(name)
-    if not name or name == "" then return end
-    if delfile then
-        local path = gameProfilePath(name)
-        pcall(function() delfile(path) end)
-        pushSessionEvent("Deleted game profile "..name)
-    end
-end
-
-local function setAutoGameProfile(name)
-    if not name or name == "" then return end
-    ensureGameProfileDir()
-    pcall(function() writefile(gameProfileAutoPath(), name) end)
-    config.lastGameProfile = name
-    toast("Auto-load game profile: "..name)
-end
-
-ensureModuleDir()
-do
-    local gameLoader = requireModule("modules/game_loader.lua")
-    if gameLoader and gameLoader.load then
-        local ctx = {config=config, toast=toast, pushLog=pushLog, requireModule=requireModule, registerTeleports=registerGameTeleports}
-        local detected = {isFisch=isFisch, isFishIt=isFishIt, isForge=isForge, isRivals=isRivals, isInk=isInk, detectedGame=detectedGame}
-        gameLoader.load(ctx, detected)
-    end
 end
 
 -- UI builders
@@ -996,6 +571,208 @@ local function makeDropdown(parent,label,options,cb,defaultVal)
     local function set(val) btn.Text=val; if cb then cb(val) end end
     btn.MouseButton1Click:Connect(function() ripple(btn); local next=1; for i,opt in ipairs(options) do if opt==btn.Text then next=i%#options+1 end end; set(options[next]) end)
     set(defaultVal or options[1]); return set
+end
+
+-- Key system helpers
+local function verifyKey(inputKey)
+    if not config.keySystem or config.keySystem.enabled == false then
+        return true, "Key system disabled"
+    end
+    if not inputKey or inputKey == "" then
+        return false, "Enter your key"
+    end
+    if config.keySystem.lastKey == inputKey then
+        return true, "Cached: welcome back"
+    end
+    for _,k in ipairs(config.keySystem.validKeys or {}) do
+        if k == inputKey then
+            config.keySystem.lastKey = inputKey
+            return true, "Key accepted"
+        end
+    end
+    if config.keySystem.verifyEndpoint and config.keySystem.verifyEndpoint ~= "" then
+        local url = string.format("%s?key=%s", config.keySystem.verifyEndpoint, HttpService:UrlEncode(inputKey))
+        local ok, res = pcall(function()
+            return http_request({Url=url, Method="GET"})
+        end)
+        if ok and res and res.StatusCode == 200 then
+            local decodeOk, body = pcall(function()
+                return HttpService:JSONDecode(res.Body)
+            end)
+            if decodeOk then
+                local valid = body.valid == true or body.status == "ok" or body.keyValid == true
+                if valid then
+                    config.keySystem.lastKey = inputKey
+                    return true, body.message or "Key verified"
+                end
+            end
+        end
+    end
+    return false, "Invalid or expired key"
+end
+
+local function copyLink(url, label)
+    if not url or url == "" then
+        toast(label .. " link unavailable")
+        return
+    end
+    pcall(function()
+        if setclipboard then setclipboard(url) end
+    end)
+    toast(label .. " link copied")
+end
+
+local function requireKeyGate()
+    if not config.keySystem or config.keySystem.enabled == false then return true end
+    local accepted = false
+    local gateDone = Instance.new("BindableEvent")
+
+    local gateGui = Instance.new("ScreenGui")
+    gateGui.Name = "KeyGate"
+    gateGui.ResetOnSpawn = false
+    gateGui.Parent = game:GetService("CoreGui")
+
+    local shade = Instance.new("Frame")
+    shade.Size = UDim2.new(1,0,1,0)
+    shade.BackgroundColor3 = Color3.new(0,0,0)
+    shade.BackgroundTransparency = 0.45
+    shade.BorderSizePixel = 0
+    shade.Parent = gateGui
+
+    local panel = Instance.new("Frame")
+    panel.Size = UDim2.new(0, 420, 0, 260)
+    panel.Position = UDim2.new(0.5,-210,0.5,-130)
+    panel.BackgroundColor3 = colors.panel:lerp(colors.accent2,0.08)
+    panel.BackgroundTransparency = 0.06
+    panel.BorderSizePixel = 0
+    panel.Parent = gateGui
+    makeCorner(panel,16)
+    stylizeCard(panel)
+
+    local grad = Instance.new("UIGradient", panel)
+    grad.Rotation = 35
+    grad.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, colors.panel),
+        ColorSequenceKeypoint.new(1, colors.panel:lerp(colors.accent,0.14)),
+    })
+
+    local title = Instance.new("TextLabel")
+    title.BackgroundTransparency = 1
+    title.Size = UDim2.new(1,-20,0,34)
+    title.Position = UDim2.new(0,10,0,12)
+    title.Font = Enum.Font.GothamBold
+    title.TextColor3 = colors.text
+    title.TextSize = 20
+    title.TextXAlignment = Enum.TextXAlignment.Left
+    title.Text = "Premium Access Required"
+    title.Parent = panel
+
+    local subtitle = Instance.new("TextLabel")
+    subtitle.BackgroundTransparency = 1
+    subtitle.Size = UDim2.new(1,-20,0,18)
+    subtitle.Position = UDim2.new(0,10,0,44)
+    subtitle.Font = Enum.Font.Gotham
+    subtitle.TextColor3 = colors.subtle
+    subtitle.TextSize = 14
+    subtitle.TextXAlignment = Enum.TextXAlignment.Left
+    subtitle.Text = "Enter your key to unlock the hub"
+    subtitle.Parent = panel
+
+    local input = Instance.new("TextBox")
+    input.Size = UDim2.new(1,-20,0,38)
+    input.Position = UDim2.new(0,10,0,76)
+    input.BackgroundColor3 = colors.bg:lerp(colors.accent2,0.06)
+    input.BackgroundTransparency = 0.08
+    input.BorderSizePixel = 0
+    input.Font = Enum.Font.GothamSemibold
+    input.TextSize = 15
+    input.TextColor3 = colors.text
+    input.PlaceholderText = "Enter key here"
+    input.ClearTextOnFocus = false
+    input.Parent = panel
+    makeCorner(input,10)
+
+    local status = Instance.new("TextLabel")
+    status.BackgroundTransparency = 1
+    status.Size = UDim2.new(1,-20,0,18)
+    status.Position = UDim2.new(0,10,0,120)
+    status.Font = Enum.Font.Gotham
+    status.TextColor3 = colors.subtle
+    status.TextSize = 13
+    status.TextXAlignment = Enum.TextXAlignment.Left
+    status.Text = "Waiting for key..."
+    status.Parent = panel
+
+    local buttons = Instance.new("Frame")
+    buttons.Size = UDim2.new(1,-20,0,44)
+    buttons.Position = UDim2.new(0,10,0,152)
+    buttons.BackgroundTransparency = 1
+    buttons.Parent = panel
+    local bl = Instance.new("UIListLayout", buttons)
+    bl.FillDirection = Enum.FillDirection.Horizontal
+    bl.Padding = UDim.new(0,8)
+    bl.HorizontalAlignment = Enum.HorizontalAlignment.Center
+
+    local function makeKeyButton(text, color, callback)
+        local b = Instance.new("TextButton")
+        b.Size = UDim2.new(0.33,-6,1,0)
+        b.BackgroundColor3 = color
+        b.BackgroundTransparency = 0.08
+        b.BorderSizePixel = 0
+        b.AutoButtonColor = false
+        b.Font = Enum.Font.GothamSemibold
+        b.TextColor3 = Color3.new(1,1,1)
+        b.TextSize = 14
+        b.Text = text
+        b.Parent = buttons
+        makeCorner(b,12)
+        b.MouseEnter:Connect(function() tween(b,0.1,{BackgroundTransparency=0}) end)
+        b.MouseLeave:Connect(function() tween(b,0.12,{BackgroundTransparency=0.08}) end)
+        b.MouseButton1Click:Connect(function()
+            ripple(b)
+            if callback then callback() end
+        end)
+        return b
+    end
+
+    local verifying = false
+    local function attemptVerify()
+        if verifying then return end
+        verifying = true
+        status.TextColor3 = colors.subtle
+        status.Text = "Verifying..."
+        task.spawn(function()
+            local ok,msg = verifyKey(input.Text)
+            if ok then
+                status.TextColor3 = colors.success
+                status.Text = msg or "Key accepted"
+                accepted = true
+                task.delay(0.35, function()
+                    gateGui:Destroy()
+                    gateDone:Fire(true)
+                end)
+            else
+                status.TextColor3 = colors.danger
+                status.Text = msg or "Invalid key"
+                verifying = false
+            end
+        end)
+    end
+
+    makeKeyButton("Verify Key", colors.accent, attemptVerify)
+    makeKeyButton("Get Key", colors.warn, function()
+        copyLink(config.keySystem.websiteUrl, "Key website")
+    end)
+    makeKeyButton("Discord", colors.accent2, function()
+        copyLink(config.keySystem.discordUrl, "Discord invite")
+    end)
+
+    input.FocusLost:Connect(function(enter)
+        if enter then attemptVerify() end
+    end)
+
+    gateDone.Event:Wait()
+    return accepted
 end
 
 -- ESP helpers
@@ -1072,15 +849,7 @@ local function buildFishAutomation(parent)
 
     sectionTitle(parent,"Hotspots & Travel")
     makeDropdown(parent,"Teleport fishing spot",{"Ocean","River","Lake","Lava","Ice Cave","Deep Sea"},function(v) config.fisch.spotTeleport=v end, config.fisch.spotTeleport ~= "" and config.fisch.spotTeleport or "Ocean")
-        makeButton(parent,"Teleport to spot",function()
-            local target = config.fisch.spotTeleport or "Ocean"
-            if teleportToSpot(target) then
-                pushSessionEvent("Teleported to "..target)
-                toast("Teleported to "..target)
-            else
-                toast("Spot not found: "..target)
-            end
-        end)
+    makeButton(parent,"Teleport to spot",function() pushSessionEvent("Teleport to fishing spot: "..(config.fisch.spotTeleport or "Ocean")); toast("Teleporting to "..(config.fisch.spotTeleport or "Ocean")) end)
     makeButton(parent,"Rescan hotspots",function() pushSessionEvent("Hotspots rescanned") end)
     local hotspotRow=Instance.new("Frame"); hotspotRow.Size=UDim2.new(1,-10,0,30); hotspotRow.BackgroundTransparency=1; hotspotRow.Parent=parent
     local hl=Instance.new("UIListLayout",hotspotRow); hl.FillDirection=Enum.FillDirection.Horizontal; hl.Padding=UDim.new(0,6)
@@ -1109,41 +878,52 @@ local function buildFishAutomation(parent)
     if isFishIt then
         sectionTitle(parent,"Fish It Travel & Vendors")
         makeDropdown(parent,"Teleport fishing biome",{"Ocean","River","Lake","Cave","Lava","Deep sea"},function(v) config.fishit.tpSpot=v end, config.fishit.tpSpot)
-        makeButton(parent,"Teleport to biome",function()
-            local target = config.fishit.tpSpot or "Ocean"
-            if teleportToSpot(target) then
-                pushSessionEvent("Teleported to "..target)
-                toast("Teleported to "..target)
-            else
-                toast("Biome not found: "..target)
-            end
-        end)
         makeDropdown(parent,"Vendor teleports",{"Shop","Sell NPC","Bait Vendor","Upgrade Station"},function(v) config.fishit.tpVendor=v end, config.fishit.tpVendor)
-        makeButton(parent,"Teleport to vendor",function()
-            local target = config.fishit.tpVendor or "Shop"
-            if teleportToSpot(target) then
-                pushSessionEvent("Teleported to "..target)
-                toast("Teleported to "..target)
-            else
-                toast("Vendor not found: "..target)
-            end
-        end)
+        makeButton(parent,"Teleport to vendor",function() pushSessionEvent("Fish It vendor TP: "..(config.fishit.tpVendor or "Shop")) end)
         makeDropdown(parent,"Saved waypoint",{"Favorite 1","Favorite 2","Favorite 3"},function(v) config.fishit.savedWaypoint=v end, config.fishit.savedWaypoint)
-        makeToggle(parent,"Hotspot ESP",function(on)
-            config.fishit.hotspotEsp=on
-            if on then addWorldTagESP({"hotspot","spot","fish"}, Color3.fromRGB(60,200,255), Color3.fromRGB(10,120,200)) else clearWorldESP() end
-        end, config.fishit.hotspotEsp)
-        makeToggle(parent,"Vendor/NPC ESP",function(on)
-            config.fishit.vendorEsp=on
-            if on then addWorldTagESP({"vendor","shop","npc","merchant"}, Color3.fromRGB(255,200,120), Color3.fromRGB(200,140,60)) else clearWorldESP() end
-        end, config.fishit.vendorEsp)
+        local hopRow=Instance.new("Frame"); hopRow.Size=UDim2.new(1,-10,0,28); hopRow.BackgroundTransparency=1; hopRow.Parent=parent
+        local hopList=Instance.new("UIListLayout",hopRow); hopList.FillDirection=Enum.FillDirection.Horizontal; hopList.Padding=UDim.new(0,6)
+        for _,label in ipairs(config.fishit.hotspotWaypoints) do
+            local b=Instance.new("TextButton"); b.Size=UDim2.fromOffset(90,24); b.BackgroundColor3=colors.bg; b.BorderSizePixel=0; b.TextColor3=colors.text; b.Font=Enum.Font.GothamSemibold; b.TextSize=13; b.Text=label; makeCorner(b,8); b.Parent=hopRow
+            b.MouseButton1Click:Connect(function() toast("Teleporting to "..label); pushSessionEvent("Fish It hop: "..label) end)
+        end
+        addDivider(parent)
+
+        sectionTitle(parent,"Fish It Targeting & Filters")
+        local fiRarity=Instance.new("TextBox"); fiRarity.Size=UDim2.new(1,-10,0,30); fiRarity.BackgroundColor3=colors.bg; fiRarity.TextColor3=colors.text; fiRarity.Text=config.fishit.rarityFilter; fiRarity.PlaceholderText="Rarity filter (comma)"; fiRarity.BorderSizePixel=0; fiRarity.Font=Enum.Font.Gotham; fiRarity.TextSize=14; makeCorner(fiRarity,8); fiRarity.Parent=parent; fiRarity.FocusLost:Connect(function() config.fishit.rarityFilter=fiRarity.Text end)
+        makeSlider(parent,"Value filter (keep >= coins)",0,2000,config.fishit.valueFilter or 0,function(v) config.fishit.valueFilter=v end)
+        local fiWhite=Instance.new("TextBox"); fiWhite.Size=UDim2.new(1,-10,0,30); fiWhite.BackgroundColor3=colors.bg; fiWhite.TextColor3=colors.text; fiWhite.Text=config.fishit.whitelist; fiWhite.PlaceholderText="Whitelist (always keep)"; fiWhite.BorderSizePixel=0; fiWhite.Font=Enum.Font.Gotham; fiWhite.TextSize=14; makeCorner(fiWhite,8); fiWhite.Parent=parent; fiWhite.FocusLost:Connect(function() config.fishit.whitelist=fiWhite.Text end)
+        local fiBlack=Instance.new("TextBox"); fiBlack.Size=UDim2.new(1,-10,0,30); fiBlack.BackgroundColor3=colors.bg; fiBlack.TextColor3=colors.text; fiBlack.Text=config.fishit.blacklist; fiBlack.PlaceholderText="Blacklist junk"; fiBlack.BorderSizePixel=0; fiBlack.Font=Enum.Font.Gotham; fiBlack.TextSize=14; makeCorner(fiBlack,8); fiBlack.Parent=parent; fiBlack.FocusLost:Connect(function() config.fishit.blacklist=fiBlack.Text end)
+        makeDropdown(parent,"Mode",{"Money","XP","Event"},function(v) config.fishit.mode=v end, config.fishit.mode)
+        makeToggle(parent,"XP mode",function(on) config.fishit.xpMode=on end, config.fishit.xpMode)
+        makeToggle(parent,"Money mode",function(on) config.fishit.moneyMode=on end, config.fishit.moneyMode)
+        addDivider(parent)
+
+        sectionTitle(parent,"Fish It Inventory & Selling")
+        makeToggle(parent,"Auto-sell when full",function(on) config.fishit.autoSellFull=on end, config.fishit.autoSellFull)
+        makeDropdown(parent,"Auto-sell below rarity",{"Common","Uncommon","Rare","Epic","Legendary"},function(v) config.fishit.autoSellRarity=v end, config.fishit.autoSellRarity)
+        makeSlider(parent,"Auto-sell below value",0,2000,config.fishit.autoSellValue or 250,function(v) config.fishit.autoSellValue=v end)
+        makeToggle(parent,"Auto-discard junk",function(on) config.fishit.autoDiscardJunk=on end, config.fishit.autoDiscardJunk)
+        makeToggle(parent,"Lock favorites",function(on) config.fishit.lockFavorites=on end, config.fishit.lockFavorites)
+        makeDropdown(parent,"Sort fish by",{"Rarity","Value","Size"},function(v) config.fishit.sortMode=v end, config.fishit.sortMode)
+        addDivider(parent)
+
+        sectionTitle(parent,"Fish It Visuals & HUD")
+        makeToggle(parent,"Hotspot ESP",function(on) config.fishit.hotspotEsp=on end, config.fishit.hotspotEsp)
+        makeToggle(parent,"Vendor/NPC ESP",function(on) config.fishit.vendorEsp=on end, config.fishit.vendorEsp)
         makeToggle(parent,"Pier labels",function(on) config.fishit.pierLabels=on end, config.fishit.pierLabels)
         makeToggle(parent,"Fullbright / no fog",function(on) config.fishit.fullbright=on; config.fishit.noFog=on end, config.fishit.fullbright)
         makeSlider(parent,"Camera FOV",60,110,config.fishit.fov,function(v) config.fishit.fov=v; camera.FieldOfView=v end)
         makeDropdown(parent,"Overlay mode",{"Money/hour","XP/hour","Fish per minute"},function(v) config.fishit.overlayMode=v end, config.fishit.overlayMode)
+        makeToggle(parent,"Mini HUD (mode/location/time)",function(on) config.fishit.miniHud=on end, config.fishit.miniHud)
+        addDivider(parent)
+
+        sectionTitle(parent,"Events & Server Tools")
         makeToggle(parent,"Event-only fishing",function(on) config.fishit.eventOnly=on end, config.fishit.eventOnly)
+        makeToggle(parent,"Event alerts",function(on) config.fishit.eventAlerts=on end, config.fishit.eventAlerts)
         makeToggle(parent,"Teleport to event on start",function(on) config.fishit.tpEventOnStart=on end, config.fishit.tpEventOnStart)
         makeToggle(parent,"Anti-AFK",function(on) config.fishit.antiAfk=on end, config.fishit.antiAfk)
+        makeDropdown(parent,"Rejoin mode",{"None","Same server","Low-pop","High-pop"},function(v) config.fishit.rejoinMode=v end, config.fishit.rejoinMode)
         makeToggle(parent,"Rejoin low-pop server",function(on) config.fishit.rejoinLowPop=on end, config.fishit.rejoinLowPop)
         addDivider(parent)
     end
@@ -1154,6 +934,7 @@ local function buildFishAutomation(parent)
         makeDropdown(parent,"Route preset",{"Snowcap cave route","Ocean mythic loop","Harbor hotspots"},function(v) config.fischPro.routePreset=v end, config.fischPro.routePreset)
         makeDropdown(parent,"Condition preset",{"Foggy night mythic","Sunny day legendary","Rainy treasure"},function(v) config.fischPro.conditionPreset=v end, config.fischPro.conditionPreset)
         makeToggle(parent,"Auto-switch on time/weather",function(on) config.fischPro.autoSwitchTime=on; config.fischPro.autoSwitchWeather=on end, config.fischPro.autoSwitchTime)
+        makeDropdown(parent,"Condition mode",{"Auto-best","Weather-first","Time-first"},function(v) config.fischPro.conditionMode=v end, config.fischPro.conditionMode)
         makeDropdown(parent,"Mode",{"Always complete","Perfect focus","Humanized"},function(v) config.fischPro.mode=v end, config.fischPro.mode)
         makeDropdown(parent,"Rarity target",{"Trash","Common","Uncommon","Unusual","Rare","Legendary","Mythical","Relic","Event"},function(v) config.fischPro.rarityTier=v end, config.fischPro.rarityTier)
         makeSlider(parent,"Value filter (sell <)",0,3000,config.fischPro.autoSellValue or 500,function(v) config.fischPro.autoSellValue=v end)
@@ -1164,24 +945,17 @@ local function buildFishAutomation(parent)
         makeDropdown(parent,"Bait rule",{"Don’t waste rare bait","Use best bait","Use cheap bait"},function(v) config.fischPro.baitRule=v end, config.fischPro.baitRule)
         makeDropdown(parent,"Boat route",{"Harbor loop","Island hop","Dock > hotspot"},function(v) config.fischPro.boatRoute=v end, config.fischPro.boatRoute)
         makeDropdown(parent,"Bestiary focus",{"Mythic","Relic","Event","Full completion"},function(v) config.fischPro.bestiaryFocus=v end, config.fischPro.bestiaryFocus)
-        makeToggle(parent,"Hotspot ESP",function(on)
-            config.fischPro.hotspotEsp=on
-            if on then addWorldTagESP({"hotspot","spot","fish"}, Color3.fromRGB(60,200,255), Color3.fromRGB(10,120,200)) else clearWorldESP() end
-        end, config.fischPro.hotspotEsp)
-        makeToggle(parent,"Landmark ESP",function(on)
-            config.fischPro.landmarkEsp=on
-            if on then addWorldTagESP({"landmark","island","dock"}, Color3.fromRGB(170,110,255), Color3.fromRGB(130,80,210)) else clearWorldESP() end
-        end, config.fischPro.landmarkEsp)
-        makeToggle(parent,"Mythic condition markers",function(on)
-            config.fischPro.mythicMarker=on
-            if on then addWorldTagESP({"mythic","event","boss"}, Color3.fromRGB(255,90,130), Color3.fromRGB(200,60,90)) else clearWorldESP() end
-        end, config.fischPro.mythicMarker)
+        makeToggle(parent,"Highlight missing fish",function(on) config.fischPro.bestiaryMissing=on end, config.fischPro.bestiaryMissing)
+        makeToggle(parent,"Hotspot ESP",function(on) config.fischPro.hotspotEsp=on end, config.fischPro.hotspotEsp)
+        makeToggle(parent,"Landmark ESP",function(on) config.fischPro.landmarkEsp=on end, config.fischPro.landmarkEsp)
+        makeToggle(parent,"Mythic condition markers",function(on) config.fischPro.mythicMarker=on end, config.fischPro.mythicMarker)
         makeToggle(parent,"Lock favorites",function(on) config.fischPro.lockFavorites=on end, config.fischPro.lockFavorites)
         makeToggle(parent,"Profit tracking HUD",function(on) config.fischPro.profitTrack=on end, config.fischPro.profitTrack)
         makeToggle(parent,"Alert rare events/boss windows",function(on) config.fischPro.alertEvents=on end, config.fischPro.alertEvents)
         local bossBox=Instance.new("TextBox"); bossBox.Size=UDim2.new(1,-10,0,30); bossBox.BackgroundColor3=colors.bg; bossBox.TextColor3=colors.text; bossBox.Text=config.fischPro.bossTargets; bossBox.PlaceholderText="Boss/secret fish targets"; bossBox.BorderSizePixel=0; bossBox.Font=Enum.Font.Gotham; bossBox.TextSize=14; makeCorner(bossBox,8); bossBox.Parent=parent; bossBox.FocusLost:Connect(function() config.fischPro.bossTargets=bossBox.Text end)
         makeDropdown(parent,"Rejoin mode",{"None","Same server","New low-pop","New high-pop"},function(v) config.fischPro.rejoinMode=v end, config.fischPro.rejoinMode)
         makeDropdown(parent,"Overlay profile",{"Session","Coins/hour","XP/hour"},function(v) config.fischPro.overlayProfile=v end, config.fischPro.overlayProfile)
+        makeToggle(parent,"Session HUD",function(on) config.fischPro.sessionHud=on end, config.fischPro.sessionHud)
         addDivider(parent)
     end
 end
@@ -1200,11 +974,21 @@ local function buildForgePlanner(parent)
     makeDropdown(parent,"Recipe tag",{"DPS","Tank","Hybrid","Farm"},function(v) config.forgePlanner.recipeTag=v end, config.forgePlanner.recipeTag)
     makeDropdown(parent,"Weapon profile",{"Fire greatsword","Crit dual blades","Safe tank sword"},function(v) config.forgePlanner.weaponProfile=v end, config.forgePlanner.weaponProfile)
     makeDropdown(parent,"Armor profile",{"Goblin Cave tank set","Volcanic Depths survival","Boss fight kit"},function(v) config.forgePlanner.armorProfile=v end, config.forgePlanner.armorProfile)
+    makeDropdown(parent,"Compare weapon",{"Crit dual blades","Balanced longsword","Cleaver"},function(v) config.forgePlanner.weaponCompare=v end, config.forgePlanner.weaponCompare)
+    makeDropdown(parent,"Compare armor",{"Volcanic Depths survival","Boss fight kit","Light scout"},function(v) config.forgePlanner.armorCompare=v end, config.forgePlanner.armorCompare)
     addDivider(parent)
 
     sectionTitle(parent,"Runes & Builds")
     makeDropdown(parent,"Rune page",{"DPS page","Tank page","Utility/balance"},function(v) config.forgePlanner.runePage=v end, config.forgePlanner.runePage)
+    makeDropdown(parent,"Rune target",{"Tank page","Utility/balance","Hybrid"},function(v) config.forgePlanner.runeTarget=v end, config.forgePlanner.runeTarget)
     makeDropdown(parent,"Zone roadmap",{"Recommended order","Danger-first","Quest-first"},function(v) config.forgePlanner.zoneRoute=v end, config.forgePlanner.zoneRoute)
+    makeDropdown(parent,"Progression preset",{"Quest-first","Economy","Boss prep"},function(v) config.forgePlanner.progressionPreset=v end, config.forgePlanner.progressionPreset)
+    addDivider(parent)
+
+    sectionTitle(parent,"Weapon & Armor Planner")
+    makeDropdown(parent,"Goal type",{"Gold/hour","Ore/hour","Power"},function(v) config.forgePlanner.goalType=v end, config.forgePlanner.goalType)
+    makeDropdown(parent,"Weapon build",{"Fire greatsword build","Crit dual-blade build","Safe tanky sword"},function(v) config.forgePlanner.weaponProfile=v end, config.forgePlanner.weaponProfile)
+    makeDropdown(parent,"Armor build",{"Goblin Cave tank set","Volcanic Depths survival set","Boss fight kit"},function(v) config.forgePlanner.armorProfile=v end, config.forgePlanner.armorProfile)
     addDivider(parent)
 
     sectionTitle(parent,"Session HUD")
@@ -1213,37 +997,16 @@ local function buildForgePlanner(parent)
     addDivider(parent)
 end
 
-local espPalettes = {
-    Blue   = {accent=Color3.fromRGB(0,145,255), outline=Color3.fromRGB(0,110,200), box=Color3.fromRGB(0,145,255), tracer=Color3.fromRGB(0,145,255)},
-    Red    = {accent=Color3.fromRGB(255,90,90), outline=Color3.fromRGB(200,50,50), box=Color3.fromRGB(255,90,90), tracer=Color3.fromRGB(255,90,90)},
-    Green  = {accent=Color3.fromRGB(70,210,140), outline=Color3.fromRGB(40,160,100), box=Color3.fromRGB(70,210,140), tracer=Color3.fromRGB(70,210,140)},
-    Purple = {accent=Color3.fromRGB(170,110,255), outline=Color3.fromRGB(130,80,210), box=Color3.fromRGB(170,110,255), tracer=Color3.fromRGB(170,110,255)},
-    Gold   = {accent=Color3.fromRGB(255,200,90), outline=Color3.fromRGB(220,160,60), box=Color3.fromRGB(255,200,90), tracer=Color3.fromRGB(255,200,90)},
-    Cyan   = {accent=Color3.fromRGB(80,220,255), outline=Color3.fromRGB(30,170,210), box=Color3.fromRGB(80,220,255), tracer=Color3.fromRGB(80,220,255)},
-    Orange = {accent=Color3.fromRGB(255,160,70), outline=Color3.fromRGB(220,120,50), box=Color3.fromRGB(255,160,70), tracer=Color3.fromRGB(255,160,70)},
-    White  = {accent=Color3.fromRGB(245,245,245), outline=Color3.fromRGB(200,200,200), box=Color3.fromRGB(245,245,245), tracer=Color3.fromRGB(245,245,245)},
-}
 local function applyEspPreset(name)
-    local p = espPalettes[name]
-    if p then
-        config.esp.colors = {accent=p.accent, outline=p.outline, box=p.box, tracer=p.tracer, preset=name}
-        config.esp.palette = name
-        clearESP()
-        if config.esp.enabled then for _,pl in ipairs(Players:GetPlayers()) do task.spawn(function() addESP(pl) end) end end
-    end
-end
-
-local function applyAimbotProfile(name)
-    local p = config.aimbotProfiles and config.aimbotProfiles[name]
-    if not p then return end
-    config.aimbotSmooth = p.smooth or config.aimbotSmooth
-    config.aimbotFov = p.fov or config.aimbotFov
-    config.triggerEnabled = p.trigger or false
-    config.silentAim = p.silent or false
-    if p.area then config.aimbotArea = p.area end
-    config.lastAimbotProfile = name
-    if fovCircle then fovCircle.Size = UDim2.fromOffset(config.aimbotFov, config.aimbotFov) end
-    toast("Aimbot profile: "..name)
+    local presets = {
+        Blue   = {accent=Color3.fromRGB(0,145,255), outline=Color3.fromRGB(0,110,200), box=Color3.fromRGB(0,145,255), tracer=Color3.fromRGB(0,145,255)},
+        Red    = {accent=Color3.fromRGB(255,90,90), outline=Color3.fromRGB(200,50,50), box=Color3.fromRGB(255,90,90), tracer=Color3.fromRGB(255,90,90)},
+        Green  = {accent=Color3.fromRGB(70,210,140), outline=Color3.fromRGB(40,160,100), box=Color3.fromRGB(70,210,140), tracer=Color3.fromRGB(70,210,140)},
+        Purple = {accent=Color3.fromRGB(170,110,255), outline=Color3.fromRGB(130,80,210), box=Color3.fromRGB(170,110,255), tracer=Color3.fromRGB(170,110,255)},
+        Gold   = {accent=Color3.fromRGB(255,200,90), outline=Color3.fromRGB(220,160,60), box=Color3.fromRGB(255,200,90), tracer=Color3.fromRGB(255,200,90)},
+    }
+    local p = presets[name]
+    if p then config.esp.colors = p; config.esp.colors.preset = name; clearESP(); if config.esp.enabled then for _,pl in ipairs(Players:GetPlayers()) do task.spawn(function() addESP(pl) end) end end end
 end
 
 function addESP(plr)
@@ -1254,115 +1017,42 @@ function addESP(plr)
     local c = config.esp.colors
     local fillColor = config.esp.teamColors and plr.TeamColor and plr.TeamColor.Color or c.accent
     local opacity = config.esp.opacity or 0.6
-    local h
-    if config.esp.boxes then
-        h=Instance.new("Highlight")
-        h.FillColor=fillColor
-        h.OutlineColor=c.outline
-        h.FillTransparency=config.esp.outlineOnly and 1 or (1-opacity)
-        h.OutlineTransparency=1-opacity
-        h.Adornee=char
-        h.DepthMode=Enum.HighlightDepthMode.AlwaysOnTop
-        h.Parent=char
-        table.insert(highlightObjects,h)
-    end
+    local h=Instance.new("Highlight"); h.FillColor=fillColor; h.OutlineColor=c.outline; h.FillTransparency=1-opacity; h.OutlineTransparency=1-opacity; h.Adornee=char; h.DepthMode=Enum.HighlightDepthMode.AlwaysOnTop; h.Parent=char; table.insert(highlightObjects,h)
     if config.esp.names then
         local bill=Instance.new("BillboardGui"); bill.AlwaysOnTop=true; bill.Size=UDim2.new(0,200,0,40); bill.Adornee=hrp; bill.Parent=char
-        local txt=Instance.new("TextLabel"); txt.BackgroundTransparency=1; txt.Size=UDim2.new(1,0,1,0); txt.Font=Enum.Font.GothamSemibold; txt.TextColor3=colors.text; txt.TextStrokeTransparency=0.4; txt.TextStrokeColor3=colors.bg; txt.TextSize=config.esp.nameSize or 14; txt.Text=plr.Name; txt.Parent=bill
+        local txt=Instance.new("TextLabel"); txt.BackgroundTransparency=1; txt.Size=UDim2.new(1,0,1,0); txt.Font=Enum.Font.GothamSemibold; txt.TextColor3=colors.text; txt.TextStrokeTransparency=0.4; txt.TextStrokeColor3=colors.bg; txt.TextSize=14; txt.Text=plr.Name; txt.Parent=bill
         if config.esp.healthbar and hum then
             local barFrame=Instance.new("Frame"); barFrame.Size=UDim2.new(0.4,0,0,6); barFrame.Position=UDim2.new(0.3,0,1,-4); barFrame.BackgroundColor3=colors.bg; barFrame.BorderSizePixel=0; makeCorner(barFrame,6); barFrame.Parent=bill
             local fill=Instance.new("Frame"); fill.BackgroundColor3=colors.success; fill.Size=UDim2.new(1,0,1,0); fill.BorderSizePixel=0; makeCorner(fill,6); fill.Parent=barFrame
             RunService.RenderStepped:Connect(function() if hum then fill.Size=UDim2.new(math.clamp(hum.Health/hum.MaxHealth,0,1),0,1,0) end end)
         end
-        if config.esp.healthbar and hum and config.esp.healthbarPos == "Top" then
-            for _,child in ipairs(bill:GetChildren()) do
-                if child:IsA("Frame") then child.Position = UDim2.new(0.3,0,0,-6) end
-            end
-        end
-        if config.esp.distance or config.esp.fadeEnabled or (config.esp.maxDistance or 0) > 0 then
-            RunService.RenderStepped:Connect(function()
-                if not bill.Parent or not hrp or not HRP then return end
-                local mag=(hrp.Position-HRP.Position).Magnitude
-                if config.esp.distance then
-                    txt.Text=("%s | %dm"):format(plr.Name, math.floor(mag))
-                else
-                    txt.Text=plr.Name
-                end
-                local maxD = config.esp.maxDistance or 0
-                local visible = (maxD == 0) or (mag <= maxD)
-                bill.Enabled = visible
-                if h then h.Enabled = visible end
-                if config.esp.fadeEnabled then
-                    local startD = config.esp.fadeStart or 150
-                    local endD = config.esp.fadeEnd or 500
-                    if endD <= startD then endD = startD + 1 end
-                    local mult = 1
-                    if mag > startD then mult = math.clamp(1 - (mag - startD) / (endD - startD), 0, 1) end
-                    local eff = (config.esp.opacity or 0.6) * mult
-                    if h then
-                        h.FillTransparency = config.esp.outlineOnly and 1 or (1 - eff)
-                        h.OutlineTransparency = 1 - eff
-                    end
-                    txt.TextTransparency = 1 - math.clamp(eff, 0, 1)
-                end
-            end)
+        if config.esp.distance then
+            RunService.RenderStepped:Connect(function() if bill.Parent and hrp then local mag=(hrp.Position-HRP.Position).Magnitude; txt.Text=("%s | %dm"):format(plr.Name, math.floor(mag)) end end)
         end
         table.insert(nametagObjects,bill)
     end
-    if (config.esp.fadeEnabled or (config.esp.maxDistance or 0) > 0) and not config.esp.names then
-        RunService.RenderStepped:Connect(function()
-            if not hrp or not HRP then return end
-            local mag=(hrp.Position-HRP.Position).Magnitude
-            local maxD = config.esp.maxDistance or 0
-            if h then h.Enabled = (maxD == 0) or (mag <= maxD) end
-            if config.esp.fadeEnabled and h then
-                local startD = config.esp.fadeStart or 150
-                local endD = config.esp.fadeEnd or 500
-                if endD <= startD then endD = startD + 1 end
-                local mult = 1
-                if mag > startD then mult = math.clamp(1 - (mag - startD) / (endD - startD), 0, 1) end
-                local eff = (config.esp.opacity or 0.6) * mult
-                h.FillTransparency = config.esp.outlineOnly and 1 or (1 - eff)
-                h.OutlineTransparency = 1 - eff
-            end
-        end)
-    end
     if config.esp.arrows then
         local th = config.esp.thicknessTracer or 2
-        local base = config.esp.arrowSize or 12
-        local arrow=Instance.new("Frame"); arrow.Size=UDim2.fromOffset(base+th*2,base+th*2); arrow.BackgroundColor3=c.tracer; arrow.BackgroundTransparency=1-opacity; arrow.BorderSizePixel=0; arrow.AnchorPoint=Vector2.new(0.5,0.5); arrow.Position=UDim2.new(0.5,0,0.5,0); arrow.Parent=offscreenGui
-        if config.esp.arrowStyle == "Rounded" then makeCorner(arrow,9) end
-        table.insert(arrowObjects,arrow)
-        local rotOffset = config.esp.arrowStyle == "Diamond" and 45 or 0
+        local arrow=Instance.new("Frame"); arrow.Size=UDim2.fromOffset(12+th*3,12+th*3); arrow.BackgroundColor3=c.tracer; arrow.BackgroundTransparency=1-opacity; arrow.BorderSizePixel=0; arrow.AnchorPoint=Vector2.new(0.5,0.5); arrow.Position=UDim2.new(0.5,0,0.5,0); arrow.Parent=offscreenGui; makeCorner(arrow,9); table.insert(arrowObjects,arrow)
         RunService.RenderStepped:Connect(function()
             if not hrp or not HRP then return end
-            local mag=(hrp.Position-HRP.Position).Magnitude
-            local maxD = config.esp.maxDistance or 0
-            if maxD > 0 and mag > maxD then
-                arrow.Visible = false
-                return
-            end
             local pos,on=camera:WorldToViewportPoint(hrp.Position)
             if on then arrow.Visible=false else
                 arrow.Visible=true
                 local viewport=camera.ViewportSize; local dir=(Vector2.new(pos.X,pos.Y)-viewport/2).Unit
                 local clamped=(viewport/2)+dir*math.min(viewport.X,viewport.Y)*0.45
-                arrow.Position=UDim2.fromOffset(clamped.X,clamped.Y); arrow.Rotation=math.deg(math.atan2(dir.Y,dir.X)) + rotOffset
-                if config.esp.fadeEnabled then
-                    local startD = config.esp.fadeStart or 150
-                    local endD = config.esp.fadeEnd or 500
-                    if endD <= startD then endD = startD + 1 end
-                    local mult = 1
-                    if mag > startD then mult = math.clamp(1 - (mag - startD) / (endD - startD), 0, 1) end
-                    local eff = (config.esp.opacity or 0.6) * mult
-                    arrow.BackgroundTransparency = 1 - math.clamp(eff, 0, 1)
-                end
+                arrow.Position=UDim2.fromOffset(clamped.X,clamped.Y); arrow.Rotation=math.deg(math.atan2(dir.Y,dir.X))
             end
         end)
     end
 end
 
 Players.PlayerAdded:Connect(function(p) p.CharacterAdded:Connect(function() if config.esp.enabled then addESP(p) end end) end)
+
+-- Require key before loading full UI
+if not requireKeyGate() then
+    return
+end
 
 -- GUI root
 local gui = Instance.new("ScreenGui"); gui.Name="AdvancedMenu"; gui.ResetOnSpawn=false; gui.Parent=game:GetService("CoreGui")
@@ -1428,7 +1118,7 @@ task.spawn(function()
 end)
 local versionLabel=Instance.new("TextLabel"); versionLabel.Size=UDim2.new(0,70,1,0); versionLabel.Position=UDim2.new(1,-88,0,6); versionLabel.BackgroundTransparency=1; versionLabel.Font=Enum.Font.Gotham; versionLabel.Text="v"..config.version; versionLabel.TextColor3=colors.subtle; versionLabel.TextSize=13; versionLabel.TextXAlignment=Enum.TextXAlignment.Right; versionLabel.Parent=title
 local logLabel=Instance.new("TextLabel"); logLabel.Size=UDim2.new(0,180,1,0); logLabel.Position=UDim2.new(1,-270,0,6); logLabel.BackgroundTransparency=1; logLabel.Font=Enum.Font.GothamSemibold; logLabel.Text="Logs ready"; logLabel.TextColor3=colors.warn; logLabel.TextSize=13; logLabel.TextXAlignment=Enum.TextXAlignment.Right; logLabel.Parent=title
-pushLog = function(msg)
+local function pushLog(msg)
     if logLabel then logLabel.Text = msg end
 end
 local function pushSessionEvent(msg)
@@ -1450,7 +1140,7 @@ local quick=Instance.new("Frame"); quick.Size=UDim2.new(0, mainWidth, 0, 32); qu
 local qaList=Instance.new("UIListLayout",quick); qaList.Padding=UDim.new(0,8); qaList.FillDirection=Enum.FillDirection.Horizontal; qaList.HorizontalAlignment=Enum.HorizontalAlignment.Center; qaList.VerticalAlignment=Enum.VerticalAlignment.Center
 local quickPad=Instance.new("UIPadding", quick); quickPad.PaddingLeft=UDim.new(0,12); quickPad.PaddingRight=UDim.new(0,12)
 local function pill(label,color,cb) local b=Instance.new("TextButton"); b.Size=UDim2.fromOffset(120,28); b.BackgroundColor3=color; b.BorderSizePixel=0; b.TextColor3=Color3.new(1,1,1); b.TextSize=13; b.Font=Enum.Font.GothamSemibold; b.Text=label; b.AutoButtonColor=false; makeCorner(b,14); b.Parent=quick; b.MouseButton1Click:Connect(function() ripple(b); if cb then cb() end end) end
-pill("Panic",colors.danger,function() shutdown("panic") end)
+pill("Panic",colors.danger,function() clearESP(); gui:Destroy(); offscreenGui:Destroy(); setBlur(false); Hum.WalkSpeed=wsDefault; Hum.JumpPower=jpDefault; workspace.Gravity=gravityDefault end)
 pill("Hide UI",colors.accent2,function() hidden=not hidden; main.Visible=not hidden; offscreenGui.Enabled=not hidden; setBlur(not hidden and config.uiBlur ~= false, config.blurSize or 10) end)
 pill("Rejoin",colors.accent,function() TeleportService:Teleport(game.PlaceId,LP) end)
 pill("Soft Panic",colors.warn,softPanic)
@@ -1528,10 +1218,10 @@ do
     status.Text="Mode: Universal (no per-game module)"; status.Parent=p
     local sessionInfo=Instance.new("TextLabel"); sessionInfo.BackgroundTransparency=1; sessionInfo.Size=UDim2.new(1,-10,0,20); sessionInfo.Font=Enum.Font.Gotham; sessionInfo.TextColor3=colors.subtle; sessionInfo.TextSize=13; sessionInfo.TextXAlignment=Enum.TextXAlignment.Left; sessionInfo.TextWrapped=true; sessionInfo.Parent=p
     task.spawn(function()
-        while scriptActive and sessionInfo.Parent do
+        while sessionInfo.Parent do
             local elapsed = math.floor(tick()-sessionStart)
-            local lastTarget = lastTargetName or "none"
-            local lastDist = lastTargetDist and (math.floor(lastTargetDist).."m") or "--"
+            local lastTarget = _G.__lastTargetName or "none"
+            local lastDist = _G.__lastTargetDist and (math.floor(_G.__lastTargetDist).."m") or "--"
             sessionInfo.Text = string.format("Session: %ds | Last preset: %s | Last config: %s | Last target: %s (%s)", elapsed, config.lastPreset ~= "" and config.lastPreset or "none", config.lastConfig ~= "" and config.lastConfig or "none", lastTarget, lastDist)
             task.wait(1)
         end
@@ -1647,15 +1337,12 @@ do
     local p=pages["Visuals / UI"]
     makeToggle(p,"ESP (players)",function(on) config.esp.enabled=on; clearESP(); if on then for _,pl in ipairs(Players:GetPlayers()) do addESP(pl) end end end)
     makeToggle(p,"Box ESP",function(on) config.esp.boxes=on end,config.esp.boxes)
-    makeToggle(p,"Outline Only",function(on) config.esp.outlineOnly=on; clearESP(); if config.esp.enabled then for _,pl in ipairs(Players:GetPlayers()) do addESP(pl) end end end,config.esp.outlineOnly)
     makeToggle(p,"ESP Names",function(on) config.esp.names=on; clearESP(); if config.esp.enabled then for _,pl in ipairs(Players:GetPlayers()) do addESP(pl) end end end,config.esp.names)
     makeToggle(p,"ESP Distance",function(on) config.esp.distance=on end,config.esp.distance)
     makeToggle(p,"ESP Arrows",function(on) config.esp.arrows=on; clearESP(); if config.esp.enabled then for _,pl in ipairs(Players:GetPlayers()) do addESP(pl) end end end,config.esp.arrows)
     makeToggle(p,"ESP Healthbar",function(on) config.esp.healthbar=on end,config.esp.healthbar)
     makeToggle(p,"ESP Team Colors",function(on) config.esp.teamColors=on; clearESP(); if config.esp.enabled then for _,pl in ipairs(Players:GetPlayers()) do addESP(pl) end end end,config.esp.teamColors)
-    makeDropdown(p,"ESP Palette",{"Blue","Red","Green","Purple","Gold","Cyan","Orange","White"},applyEspPreset,config.esp.palette)
-    makeDropdown(p,"Healthbar Position",{"Bottom","Top"},function(v) config.esp.healthbarPos=v; clearESP(); if config.esp.enabled then for _,pl in ipairs(Players:GetPlayers()) do addESP(pl) end end end,config.esp.healthbarPos)
-    makeDropdown(p,"Arrow Style",{"Rounded","Square","Diamond"},function(v) config.esp.arrowStyle=v; clearESP(); if config.esp.enabled then for _,pl in ipairs(Players:GetPlayers()) do addESP(pl) end end end,config.esp.arrowStyle)
+    makeDropdown(p,"ESP Color Preset",{"Blue","Red","Green","Purple","Gold"},applyEspPreset)
     addDivider(p)
     local colorBox=Instance.new("Frame"); colorBox.Size=UDim2.new(1,-10,0,70); colorBox.BackgroundColor3=colors.panel; colorBox.BorderSizePixel=0; makeCorner(colorBox,10); colorBox.Parent=p
     local grid=Instance.new("UIGridLayout",colorBox); grid.CellSize=UDim2.new(0.24,0,0,30); grid.CellPadding=UDim2.new(0,6,0,6); grid.FillDirection=Enum.FillDirection.Horizontal
@@ -1666,11 +1353,10 @@ do
     local outlineBox=colorInput("Outline","outline")
     local boxBox=colorInput("Box","box")
     local tracerBox=colorInput("Tracer","tracer")
-    makeButton(p,"Apply Custom ESP Colors",function()
+    makeButton(p,"Apply ESP Colors",function()
         local acc, out, bx, tr = parseColor(accentBox.Text), parseColor(outlineBox.Text), parseColor(boxBox.Text), parseColor(tracerBox.Text)
         if acc and out and bx and tr then
             config.esp.colors = {accent=acc, outline=out, box=bx, tracer=tr, preset="Custom"}
-            config.esp.palette = "Custom"
             clearESP(); if config.esp.enabled then for _,pl in ipairs(Players:GetPlayers()) do addESP(pl) end end
             toast("Applied custom ESP colors")
         else
@@ -1680,12 +1366,6 @@ do
     makeSlider(p,"Box Thickness",1,6,config.esp.thicknessBox or 2,function(v) config.esp.thicknessBox=v; clearESP(); if config.esp.enabled then for _,pl in ipairs(Players:GetPlayers()) do addESP(pl) end end end)
     makeSlider(p,"Tracer Thickness",1,6,config.esp.thicknessTracer or 2,function(v) config.esp.thicknessTracer=v; clearESP(); if config.esp.enabled then for _,pl in ipairs(Players:GetPlayers()) do addESP(pl) end end end)
     makeSlider(p,"ESP Opacity",0.2,1,config.esp.opacity or 0.6,function(v) config.esp.opacity=v; clearESP(); if config.esp.enabled then for _,pl in ipairs(Players:GetPlayers()) do addESP(pl) end end end)
-    makeSlider(p,"Name Size",10,20,config.esp.nameSize or 14,function(v) config.esp.nameSize=v; clearESP(); if config.esp.enabled then for _,pl in ipairs(Players:GetPlayers()) do addESP(pl) end end end)
-    makeSlider(p,"Arrow Size",8,28,config.esp.arrowSize or 12,function(v) config.esp.arrowSize=v; clearESP(); if config.esp.enabled then for _,pl in ipairs(Players:GetPlayers()) do addESP(pl) end end end)
-    makeToggle(p,"Distance Fade",function(on) config.esp.fadeEnabled=on; clearESP(); if config.esp.enabled then for _,pl in ipairs(Players:GetPlayers()) do addESP(pl) end end end,config.esp.fadeEnabled)
-    makeSlider(p,"Fade Start",50,400,config.esp.fadeStart or 150,function(v) config.esp.fadeStart=v end)
-    makeSlider(p,"Fade End",200,1200,config.esp.fadeEnd or 500,function(v) config.esp.fadeEnd=v end)
-    makeSlider(p,"Max ESP Distance (0=inf)",0,2000,config.esp.maxDistance or 0,function(v) config.esp.maxDistance=v end)
     addDivider(p)
     local filterBox=Instance.new("TextBox"); filterBox.Size=UDim2.new(1,-10,0,36); filterBox.BackgroundColor3=colors.bg; filterBox.TextColor3=colors.text; filterBox.PlaceholderText="World ESP name filter (comma separated)"; filterBox.Text=config.esp.nameFilter or ""; filterBox.BorderSizePixel=0; filterBox.Font=Enum.Font.Gotham; filterBox.TextSize=14; makeCorner(filterBox,8); filterBox.Parent=p
     filterBox.FocusLost:Connect(function() config.esp.nameFilter=filterBox.Text end)
@@ -1700,7 +1380,7 @@ do
 end
 
 -- Combat helpers
-fovCircle=Instance.new("Frame"); fovCircle.Name="FOVCircle"; fovCircle.Size=UDim2.fromOffset(config.aimbotFov,config.aimbotFov); fovCircle.Position=UDim2.fromScale(0.5,0.5); fovCircle.AnchorPoint=Vector2.new(0.5,0.5); fovCircle.BackgroundTransparency=0.9; fovCircle.BackgroundColor3=colors.accent; fovCircle.BorderSizePixel=0; fovCircle.Visible=false; fovCircle.ZIndex=9; makeCorner(fovCircle,100); fovCircle.Parent=gui
+local fovCircle=Instance.new("Frame"); fovCircle.Name="FOVCircle"; fovCircle.Size=UDim2.fromOffset(config.aimbotFov,config.aimbotFov); fovCircle.Position=UDim2.fromScale(0.5,0.5); fovCircle.AnchorPoint=Vector2.new(0.5,0.5); fovCircle.BackgroundTransparency=0.9; fovCircle.BackgroundColor3=colors.accent; fovCircle.BorderSizePixel=0; fovCircle.Visible=false; fovCircle.ZIndex=9; makeCorner(fovCircle,100); fovCircle.Parent=gui
 local function pulseFov() tween(fovCircle,0.15,{BackgroundTransparency=0.6,Size=fovCircle.Size+UDim2.fromOffset(12,12)}).Completed:Connect(function() tween(fovCircle,0.15,{BackgroundTransparency=0.9,Size=UDim2.fromOffset(config.aimbotFov,config.aimbotFov)}) end) end
 local function getClosestTarget()
     local closest, dist=nil, math.huge
@@ -1727,13 +1407,6 @@ end
 do
     local p=pages["Gameplay"]
     addDivider(p)
-    config.aimbotProfiles.Custom = {smooth=config.aimbotSmooth, fov=config.aimbotFov, trigger=config.triggerEnabled, silent=config.silentAim, area=config.aimbotArea}
-    makeDropdown(p,"Aimbot Profile",{"Legit","Balanced","Rage","Custom"},applyAimbotProfile,config.lastAimbotProfile~="" and config.lastAimbotProfile or "Custom")
-    makeButton(p,"Save Current as Custom",function()
-        config.aimbotProfiles.Custom = {smooth=config.aimbotSmooth, fov=config.aimbotFov, trigger=config.triggerEnabled, silent=config.silentAim, area=config.aimbotArea}
-        config.lastAimbotProfile = "Custom"
-        toast("Saved current settings to Custom profile")
-    end)
     makeToggle(p,"Aimbot (hold RMB)",function(on) config.aimbotEnabled=on; fovCircle.Visible=on and not hidden end)
     makeDropdown(p,"Aim Mode",{"Nearest Crosshair","Nearest Player"},function(v) config.aimbotMode=v end)
     makeDropdown(p,"Target Area",{"Head","Torso","Random"},function(v) config.aimbotArea=v end)
@@ -1746,26 +1419,6 @@ do
     makeToggle(p,"Avoid Low Health Targets",function(on) config.avoidLowHealth=on end, config.avoidLowHealth)
     makeToggle(p,"Stick to Last Target",function(on) config.stickTarget=on end, config.stickTarget)
     makeToggle(p,"Silent Aim",function(on) config.silentAim=on end, config.silentAim)
-    addDivider(p)
-    makeDropdown(p,"Freeze Mode",{"None","Legit","Hard"},function(v) config.advanced.freezeMode=v end, config.advanced.freezeMode or "None")
-    makeToggle(p,"Legit Mode",function(on)
-        config.advanced.legitMode=on
-        if on then
-            config.advanced.rageMode=false
-            applyAimbotProfile("Legit")
-            config.silentAim=false
-            config.triggerEnabled=false
-        end
-    end, config.advanced.legitMode)
-    makeToggle(p,"Rage Mode",function(on)
-        config.advanced.rageMode=on
-        if on then
-            config.advanced.legitMode=false
-            applyAimbotProfile("Rage")
-            config.silentAim=true
-            config.triggerEnabled=true
-        end
-    end, config.advanced.rageMode)
     makeButton(p,"Reset Camera FOV",function() camera.FieldOfView=70 end)
 end
 
@@ -1779,41 +1432,6 @@ do
     makeButton(p,"Start Generic Auto-Collect",function() toast("Generic auto-collect stub"); config.autoCollect=true end)
     makeButton(p,"Stop Generic Auto-Collect",function() config.autoCollect=false end)
     addDivider(p)
-    sectionTitle(p,"Advanced Automation")
-    makeToggle(p,"Auto Mine",function(on) config.advanced.autoMine=on end, config.advanced.autoMine)
-    makeSlider(p,"Auto Mine Interval",0.2,2,config.advanced.autoMineInterval or 0.6,function(v) config.advanced.autoMineInterval=v end)
-    local mineTags=Instance.new("TextBox"); mineTags.Size=UDim2.new(1,-10,0,32); mineTags.BackgroundColor3=colors.bg; mineTags.TextColor3=colors.text; mineTags.PlaceholderText="Mine tags (comma): ore,mine,rock"; mineTags.Text=config.advanced.autoMineTags or ""; mineTags.BorderSizePixel=0; mineTags.Font=Enum.Font.Gotham; mineTags.TextSize=14; makeCorner(mineTags,8); mineTags.Parent=p
-    mineTags.FocusLost:Connect(function() config.advanced.autoMineTags=mineTags.Text end)
-    makeToggle(p,"Auto Kill",function(on) config.advanced.autoKill=on end, config.advanced.autoKill)
-    makeToggle(p,"Auto Kill Players",function(on) config.advanced.autoKillPlayers=on end, config.advanced.autoKillPlayers)
-    makeToggle(p,"Auto Kill NPCs",function(on) config.advanced.autoKillNPCs=on end, config.advanced.autoKillNPCs)
-    makeSlider(p,"Auto Kill Range",10,200,config.advanced.autoKillRange or 60,function(v) config.advanced.autoKillRange=v end)
-    makeSlider(p,"Auto Kill Interval",0.1,1,config.advanced.autoKillInterval or 0.25,function(v) config.advanced.autoKillInterval=v end)
-    makeToggle(p,"Auto Equip Rod/Tool",function(on) config.advanced.autoEquipRod=on end, config.advanced.autoEquipRod)
-    makeSlider(p,"Auto Equip Interval",0.5,5,config.advanced.autoEquipInterval or 2,function(v) config.advanced.autoEquipInterval=v end)
-    local rodBox=Instance.new("TextBox"); rodBox.Size=UDim2.new(1,-10,0,32); rodBox.BackgroundColor3=colors.bg; rodBox.TextColor3=colors.text; rodBox.PlaceholderText="Tool priority (comma): rod,fish"; rodBox.Text=config.advanced.rodPriority or ""; rodBox.BorderSizePixel=0; rodBox.Font=Enum.Font.Gotham; rodBox.TextSize=14; makeCorner(rodBox,8); rodBox.Parent=p
-    rodBox.FocusLost:Connect(function() config.advanced.rodPriority=rodBox.Text end)
-    addDivider(p)
-    sectionTitle(p,"Game Teleports")
-    local tpList = (#config.gameTeleports > 0) and config.gameTeleports or {"Spawn","Shop","Vendor","Dock","Forge","Anvil","Ocean","River","Lake","Island"}
-    local selectedTp = tpList[1]
-    makeDropdown(p,"Teleport Target",tpList,function(v) selectedTp=v end, selectedTp)
-    makeButton(p,"Teleport to Selected",function()
-        if selectedTp and teleportToSpot(selectedTp) then
-            toast("Teleported to "..selectedTp)
-        else
-            toast("Spot not found: "..tostring(selectedTp))
-        end
-    end)
-    local tpBox=Instance.new("TextBox"); tpBox.Size=UDim2.new(1,-10,0,32); tpBox.BackgroundColor3=colors.bg; tpBox.TextColor3=colors.text; tpBox.PlaceholderText="Teleport by name (any object)"; tpBox.Text=""; tpBox.BorderSizePixel=0; tpBox.Font=Enum.Font.Gotham; tpBox.TextSize=14; makeCorner(tpBox,8); tpBox.Parent=p
-    makeButton(p,"Teleport by Name",function()
-        local name = tpBox.Text or ""
-        if name ~= "" and teleportToSpot(name) then
-            toast("Teleported to "..name)
-        else
-            toast("Spot not found: "..name)
-        end
-    end)
     if isFisch or isFishIt then
         buildFishAutomation(p)
     else
@@ -1822,86 +1440,6 @@ do
     if isForge then
         addDivider(p)
         buildForgePlanner(p)
-        addDivider(p)
-        sectionTitle(p,"Forge Advanced")
-        makeToggle(p,"Open Forge",function(on) config.forgeAdvanced.openForge=on end, config.forgeAdvanced.openForge)
-        makeToggle(p,"Auto Melt",function(on) config.forgeAdvanced.autoMelt=on end, config.forgeAdvanced.autoMelt)
-        makeToggle(p,"Auto Pour",function(on) config.forgeAdvanced.autoPour=on end, config.forgeAdvanced.autoPour)
-        makeToggle(p,"Auto Hammer (buggy)",function(on) config.forgeAdvanced.autoHammer=on end, config.forgeAdvanced.autoHammer)
-        addDivider(p)
-        sectionTitle(p,"Combat")
-        makeToggle(p,"Auto Attack Mobs",function(on) config.forgeAdvanced.autoAttackMobs=on end, config.forgeAdvanced.autoAttackMobs)
-        makeToggle(p,"Multi-Mob Selection",function(on) config.forgeAdvanced.multiMobSelection=on end, config.forgeAdvanced.multiMobSelection)
-        makeSlider(p,"Attack Distance",10,200,config.forgeAdvanced.attackDistance or 60,function(v) config.forgeAdvanced.attackDistance=v end)
-        makeSlider(p,"Fly Speed",10,250,config.flySpeed,function(v) config.flySpeed=v end)
-        makeToggle(p,"Auto No-Clip",function(on) config.forgeAdvanced.autoNoClip=on end, config.forgeAdvanced.autoNoClip)
-        makeDropdown(p,"Depth Control",{"Off","On"},function(v) config.forgeAdvanced.depthControl=(v=="On") end, config.forgeAdvanced.depthControl and "On" or "Off")
-        makeSlider(p,"Depth Offset", -50, 50, config.forgeAdvanced.depthOffset or 0, function(v) config.forgeAdvanced.depthOffset=v end)
-        addDivider(p)
-        sectionTitle(p,"Mining")
-        makeToggle(p,"Auto Mine Rocks",function(on) config.forgeAdvanced.autoMineRocks=on end, config.forgeAdvanced.autoMineRocks)
-        local rockBox=Instance.new("TextBox"); rockBox.Size=UDim2.new(1,-10,0,32); rockBox.BackgroundColor3=colors.bg; rockBox.TextColor3=colors.text; rockBox.PlaceholderText="Rock types (comma)"; rockBox.Text=config.forgeAdvanced.rockTypeSelection or ""; rockBox.BorderSizePixel=0; rockBox.Font=Enum.Font.Gotham; rockBox.TextSize=14; makeCorner(rockBox,8); rockBox.Parent=p
-        rockBox.FocusLost:Connect(function() config.forgeAdvanced.rockTypeSelection=rockBox.Text end)
-        local areaBox=Instance.new("TextBox"); areaBox.Size=UDim2.new(1,-10,0,32); areaBox.BackgroundColor3=colors.bg; areaBox.TextColor3=colors.text; areaBox.PlaceholderText="Area filter (optional)"; areaBox.Text=config.forgeAdvanced.areaFilter or ""; areaBox.BorderSizePixel=0; areaBox.Font=Enum.Font.Gotham; areaBox.TextSize=14; makeCorner(areaBox,8); areaBox.Parent=p
-        areaBox.FocusLost:Connect(function() config.forgeAdvanced.areaFilter=areaBox.Text end)
-        makeToggle(p,"Player Avoidance",function(on) config.forgeAdvanced.playerAvoidance=on end, config.forgeAdvanced.playerAvoidance)
-        makeSlider(p,"Mining Distance",10,150,config.forgeAdvanced.miningDistance or 50,function(v) config.forgeAdvanced.miningDistance=v end)
-        addDivider(p)
-        sectionTitle(p,"Selling")
-        makeToggle(p,"Auto Sell Weapons",function(on) config.forgeAdvanced.autoSellWeapons=on end, config.forgeAdvanced.autoSellWeapons)
-        makeToggle(p,"Auto Sell Ores",function(on) config.forgeAdvanced.autoSellOres=on end, config.forgeAdvanced.autoSellOres)
-        makeToggle(p,"Auto Sell on Full Stash",function(on) config.forgeAdvanced.autoSellOnFull=on end, config.forgeAdvanced.autoSellOnFull)
-        makeToggle(p,"Timed Auto Sell",function(on) config.forgeAdvanced.timedAutoSell=on end, config.forgeAdvanced.timedAutoSell)
-        makeSlider(p,"Sell Interval (s)",10,300,config.forgeAdvanced.sellInterval or 45,function(v) config.forgeAdvanced.sellInterval=v end)
-        makeSlider(p,"Quantity Limit (0=off)",0,500,config.forgeAdvanced.sellQuantityLimit or 0,function(v) config.forgeAdvanced.sellQuantityLimit=v end)
-        makeToggle(p,"Shop Initialization",function(on) config.forgeAdvanced.shopInit=on end, config.forgeAdvanced.shopInit)
-        addDivider(p)
-        sectionTitle(p,"Potions")
-        makeToggle(p,"Buy Potions",function(on) config.forgeAdvanced.buyPotions=on end, config.forgeAdvanced.buyPotions)
-        makeToggle(p,"Auto Drink Potions",function(on) config.forgeAdvanced.autoDrinkPotions=on end, config.forgeAdvanced.autoDrinkPotions)
-        makeToggle(p,"Auto Buy When Empty",function(on) config.forgeAdvanced.autoBuyWhenEmpty=on end, config.forgeAdvanced.autoBuyWhenEmpty)
-        local potBox=Instance.new("TextBox"); potBox.Size=UDim2.new(1,-10,0,32); potBox.BackgroundColor3=colors.bg; potBox.TextColor3=colors.text; potBox.PlaceholderText="Potion types (comma)"; potBox.Text=config.forgeAdvanced.potionTypes or ""; potBox.BorderSizePixel=0; potBox.Font=Enum.Font.Gotham; potBox.TextSize=14; makeCorner(potBox,8); potBox.Parent=p
-        potBox.FocusLost:Connect(function() config.forgeAdvanced.potionTypes=potBox.Text end)
-        addDivider(p)
-        sectionTitle(p,"Teleports")
-        local npcBox=Instance.new("TextBox"); npcBox.Size=UDim2.new(1,-10,0,32); npcBox.BackgroundColor3=colors.bg; npcBox.TextColor3=colors.text; npcBox.PlaceholderText="NPC teleport target"; npcBox.Text=config.forgeAdvanced.npcTeleportTarget or ""; npcBox.BorderSizePixel=0; npcBox.Font=Enum.Font.Gotham; npcBox.TextSize=14; makeCorner(npcBox,8); npcBox.Parent=p
-        npcBox.FocusLost:Connect(function() config.forgeAdvanced.npcTeleportTarget=npcBox.Text end)
-        makeButton(p,"Teleport to NPC",function() if teleportToSpot(config.forgeAdvanced.npcTeleportTarget) then toast("Teleported") else toast("NPC not found") end end)
-        local placeBox=Instance.new("TextBox"); placeBox.Size=UDim2.new(1,-10,0,32); placeBox.BackgroundColor3=colors.bg; placeBox.TextColor3=colors.text; placeBox.PlaceholderText="Important place"; placeBox.Text=config.forgeAdvanced.placeTeleportTarget or ""; placeBox.BorderSizePixel=0; placeBox.Font=Enum.Font.Gotham; placeBox.TextSize=14; makeCorner(placeBox,8); placeBox.Parent=p
-        placeBox.FocusLost:Connect(function() config.forgeAdvanced.placeTeleportTarget=placeBox.Text end)
-        makeButton(p,"Teleport to Place",function() if teleportToSpot(config.forgeAdvanced.placeTeleportTarget) then toast("Teleported") else toast("Place not found") end end)
-        local pickBox=Instance.new("TextBox"); pickBox.Size=UDim2.new(1,-10,0,32); pickBox.BackgroundColor3=colors.bg; pickBox.TextColor3=colors.text; pickBox.PlaceholderText="Pickaxe shop"; pickBox.Text=config.forgeAdvanced.pickaxeShopTarget or ""; pickBox.BorderSizePixel=0; pickBox.Font=Enum.Font.Gotham; pickBox.TextSize=14; makeCorner(pickBox,8); pickBox.Parent=p
-        pickBox.FocusLost:Connect(function() config.forgeAdvanced.pickaxeShopTarget=pickBox.Text end)
-        makeButton(p,"Teleport to Pickaxe Shop",function() if teleportToSpot(config.forgeAdvanced.pickaxeShopTarget) then toast("Teleported") else toast("Shop not found") end end)
-        local islandBox=Instance.new("TextBox"); islandBox.Size=UDim2.new(1,-10,0,32); islandBox.BackgroundColor3=colors.bg; islandBox.TextColor3=colors.text; islandBox.PlaceholderText="Island name"; islandBox.Text=config.forgeAdvanced.islandTeleportTarget or ""; islandBox.BorderSizePixel=0; islandBox.Font=Enum.Font.Gotham; islandBox.TextSize=14; makeCorner(islandBox,8); islandBox.Parent=p
-        islandBox.FocusLost:Connect(function() config.forgeAdvanced.islandTeleportTarget=islandBox.Text end)
-        makeButton(p,"Teleport to Island",function() if teleportToSpot(config.forgeAdvanced.islandTeleportTarget) then toast("Teleported") else toast("Island not found") end end)
-        addDivider(p)
-        sectionTitle(p,"Race / Claims")
-        makeToggle(p,"Auto Reroll Race",function(on) config.forgeAdvanced.autoRerollRace=on end, config.forgeAdvanced.autoRerollRace)
-        local raceBox=Instance.new("TextBox"); raceBox.Size=UDim2.new(1,-10,0,32); raceBox.BackgroundColor3=colors.bg; raceBox.TextColor3=colors.text; raceBox.PlaceholderText="Target race"; raceBox.Text=config.forgeAdvanced.targetRace or ""; raceBox.BorderSizePixel=0; raceBox.Font=Enum.Font.Gotham; raceBox.TextSize=14; makeCorner(raceBox,8); raceBox.Parent=p
-        raceBox.FocusLost:Connect(function() config.forgeAdvanced.targetRace=raceBox.Text end)
-        makeToggle(p,"Show Race Chances",function(on) config.forgeAdvanced.showRaceChances=on end, config.forgeAdvanced.showRaceChances)
-        makeToggle(p,"Claim All Ores",function(on) config.forgeAdvanced.claimAllOres=on end, config.forgeAdvanced.claimAllOres)
-        makeToggle(p,"Claim All Enemies",function(on) config.forgeAdvanced.claimAllEnemies=on end, config.forgeAdvanced.claimAllEnemies)
-        makeToggle(p,"Claim All Equipment",function(on) config.forgeAdvanced.claimAllEquipment=on end, config.forgeAdvanced.claimAllEquipment)
-        makeToggle(p,"One-Click Claim All",function(on) config.forgeAdvanced.claimAll=on end, config.forgeAdvanced.claimAll)
-        addDivider(p)
-        sectionTitle(p,"Rare Item Alerts")
-        makeToggle(p,"Rare Item Notifications",function(on) config.forgeAdvanced.rareItemNotify=on end, config.forgeAdvanced.rareItemNotify)
-        local rareBox=Instance.new("TextBox"); rareBox.Size=UDim2.new(1,-10,0,32); rareBox.BackgroundColor3=colors.bg; rareBox.TextColor3=colors.text; rareBox.PlaceholderText="Rarity filter (comma)"; rareBox.Text=config.forgeAdvanced.rarityFilter or ""; rareBox.BorderSizePixel=0; rareBox.Font=Enum.Font.Gotham; rareBox.TextSize=14; makeCorner(rareBox,8); rareBox.Parent=p
-        rareBox.FocusLost:Connect(function() config.forgeAdvanced.rarityFilter=rareBox.Text end)
-        addDivider(p)
-        sectionTitle(p,"World Hop")
-        makeDropdown(p,"World Hop Mode",{"None","World 1","World 2"},function(v) config.forgeAdvanced.worldHopMode=v end, config.forgeAdvanced.worldHopMode)
-        makeToggle(p,"Low Ping Priority",function(on) config.forgeAdvanced.lowPingPriority=on end, config.forgeAdvanced.lowPingPriority)
-        makeSlider(p,"Player Count Filter",0,30,config.forgeAdvanced.playerCountFilter or 0,function(v) config.forgeAdvanced.playerCountFilter=v end)
-        addDivider(p)
-        sectionTitle(p,"Misc")
-        makeToggle(p,"Auto Execute on Teleport",function(on) config.forgeAdvanced.autoExecOnTeleport=on end, config.forgeAdvanced.autoExecOnTeleport)
-        makeToggle(p,"Anti-AFK",function(on) config.antiAfk=on end, config.antiAfk)
-        local codeBox=Instance.new("TextBox"); codeBox.Size=UDim2.new(1,-10,0,50); codeBox.BackgroundColor3=colors.bg; codeBox.TextColor3=colors.text; codeBox.PlaceholderText="Redeem codes (comma)"; codeBox.Text=config.forgeAdvanced.redeemCodes or ""; codeBox.BorderSizePixel=0; codeBox.Font=Enum.Font.Gotham; codeBox.TextSize=14; makeCorner(codeBox,8); codeBox.Parent=p
-        codeBox.FocusLost:Connect(function() config.forgeAdvanced.redeemCodes=codeBox.Text end)
     end
 end
 
@@ -2011,34 +1549,6 @@ do
             toast("Select a config first")
         end
     end)
-    addDivider(p)
-    local gameProfiles = listGameProfiles()
-    local selectedGameProfile = gameProfiles[1]
-    makeDropdown(p,"Game Profile",gameProfiles,function(v) selectedGameProfile=v end, selectedGameProfile)
-    local gpName=Instance.new("TextBox"); gpName.Size=UDim2.new(1,-10,0,36); gpName.BackgroundColor3=colors.bg; gpName.TextColor3=colors.text; gpName.PlaceholderText="Game profile name"; gpName.Text=config.lastGameProfile or ""; gpName.BorderSizePixel=0; gpName.Font=Enum.Font.Gotham; gpName.TextSize=14; makeCorner(gpName,8); gpName.Parent=p
-    makeButton(p,"Save Game Profile",function()
-        local name = gpName.Text ~= "" and gpName.Text or ("Profile_"..tostring(os.time()))
-        saveGameProfile(name)
-    end)
-    makeButton(p,"Load Game Profile",function()
-        if selectedGameProfile and selectedGameProfile ~= "None" then
-            loadGameProfile(selectedGameProfile)
-        else
-            toast("No game profile selected")
-        end
-    end)
-    makeButton(p,"Delete Game Profile",function()
-        if selectedGameProfile and selectedGameProfile ~= "None" then
-            deleteGameProfile(selectedGameProfile)
-        else
-            toast("No game profile selected")
-        end
-    end)
-    makeButton(p,"Set Auto-Load Game Profile",function()
-        local name = (selectedGameProfile and selectedGameProfile ~= "None") and selectedGameProfile or gpName.Text
-        if name and name ~= "" then setAutoGameProfile(name) else toast("Pick a profile to auto-load") end
-    end)
-    makeToggle(p,"Auto-Load Game Profile",function(on) config.autoLoadGameProfile=on end, config.autoLoadGameProfile)
     addDivider(p)
     local recentBox=Instance.new("Frame"); recentBox.Size=UDim2.new(1,-10,0,90); recentBox.BackgroundColor3=colors.panel; recentBox.BorderSizePixel=0; makeCorner(recentBox,10); recentBox.Parent=p
     local recentPad=Instance.new("UIPadding",recentBox); recentPad.PaddingTop=UDim.new(0,8); recentPad.PaddingBottom=UDim.new(0,8); recentPad.PaddingLeft=UDim.new(0,10); recentPad.PaddingRight=UDim.new(0,10)
@@ -2246,7 +1756,7 @@ end
 qToggle("ESP", function() return config.esp.enabled end, function() config.esp.enabled=not config.esp.enabled; clearESP(); if config.esp.enabled then for _,pl in ipairs(Players:GetPlayers()) do addESP(pl) end end end)
 qToggle("Aimbot", function() return config.aimbotEnabled end, function() config.aimbotEnabled=not config.aimbotEnabled end)
 qToggle("Fly", function() return flyEnabled end, function() flyEnabled=not flyEnabled end)
-qToggle("Panic", function() return false end, function() shutdown("panic") end)
+qToggle("Panic", function() return false end, function() clearESP(); gui:Destroy(); offscreenGui:Destroy(); setBlur(false); Hum.WalkSpeed=wsDefault; Hum.JumpPower=jpDefault; workspace.Gravity=gravityDefault end)
 
 -- Keybinds & panic
 local function animateMenu(hiddenState)
@@ -2262,8 +1772,7 @@ local function animateMenu(hiddenState)
     end
 end
 
-table.insert(connections, UserInputService.InputBegan:Connect(function(input,gp)
-    if not scriptActive then return end
+UserInputService.InputBegan:Connect(function(input,gp)
     if gp then return end
     if input.KeyCode == config.menuKey then
         hidden = not hidden
@@ -2272,7 +1781,7 @@ table.insert(connections, UserInputService.InputBegan:Connect(function(input,gp)
         gui.Enabled = not hidden
         fovCircle.Visible = config.aimbotEnabled and not hidden
     elseif input.KeyCode == config.panicKey then
-        if config.stopOnPanic then shutdown("panic") else softPanic() end
+        softPanic()
     elseif input.KeyCode == config.keybinds.toggleAimbot then config.aimbotEnabled=not config.aimbotEnabled; fovCircle.Visible=config.aimbotEnabled
     elseif input.KeyCode == config.keybinds.toggleESP then config.esp.enabled=not config.esp.enabled; clearESP(); if config.esp.enabled then for _,pl in ipairs(Players:GetPlayers()) do addESP(pl) end end
     elseif input.KeyCode == config.keybinds.toggleFly then flyEnabled=not flyEnabled
@@ -2280,8 +1789,8 @@ table.insert(connections, UserInputService.InputBegan:Connect(function(input,gp)
     elseif input.KeyCode == config.overlayToggleKey then
         overlay.Visible = not overlay.Visible
         quickBar.Visible = not quickBar.Visible
-    elseif input.KeyCode == Enum.KeyCode.Space and infiniteJump and Hum then Hum:ChangeState(Enum.HumanoidStateType.Jumping) end
-end))
+    elseif input.KeyCode == Enum.KeyCode.Space and infiniteJump then Hum:ChangeState(Enum.HumanoidStateType.Jumping) end
+end)
 
 local function autoDisable(reason)
     config.aimbotEnabled=false
@@ -2290,47 +1799,24 @@ local function autoDisable(reason)
     noclipEnabled=false
     autoClickEnabled=false
     autoInteractEnabled=false
-    stickyTarget = nil
-    lastTargetName, lastTargetDist = nil, nil
-    clearESP(); clearWorldESP()
-    if Hum then Hum.WalkSpeed=wsDefault; Hum.JumpPower=jpDefault end
-    workspace.Gravity=gravityDefault
+    clearESP()
+    Hum.WalkSpeed=wsDefault; Hum.JumpPower=jpDefault; workspace.Gravity=gravityDefault
     pushLog("Disabled ("..reason..")")
 end
-bindHumanoid(Hum)
-table.insert(connections, TeleportService.TeleportInitFailed:Connect(function()
+Hum.Died:Connect(function()
+    if config.autoDisableOnTP then autoDisable("death") end
+end)
+TeleportService.TeleportInitFailed:Connect(function()
     if config.autoDisableOnTP then autoDisable("teleport") end
-end))
+end)
 
 -- Loops
-initPromptTracking()
 table.insert(connections, RunService.Stepped:Connect(function()
-    if not scriptActive then return end
-    if isForge and config.forgeAdvanced.autoNoClip then noclipEnabled = true end
     if noclipEnabled and Char then for _,part in ipairs(Char:GetDescendants()) do if part:IsA("BasePart") then part.CanCollide=false end end end
     if safeWalkEnabled and HRP then local ray=Ray.new(HRP.Position, Vector3.new(0,-6,0)); local hit=workspace:FindPartOnRay(ray,Char); if not hit then HRP.Velocity=Vector3.new(HRP.Velocity.X,0,HRP.Velocity.Z) end end
 end))
 
 table.insert(connections, RunService.RenderStepped:Connect(function()
-    if not scriptActive then return end
-    if isForge and config.forgeAdvanced.depthControl and HRP then
-        if not depthLockY then depthLockY = HRP.Position.Y + (config.forgeAdvanced.depthOffset or 0) end
-        HRP.CFrame = CFrame.new(HRP.Position.X, depthLockY, HRP.Position.Z)
-    else
-        depthLockY = nil
-    end
-    if config.advanced.freezeMode == "Hard" and HRP then
-        HRP.Anchored = true
-    elseif config.advanced.freezeMode ~= "Hard" and HRP then
-        HRP.Anchored = false
-    end
-    if config.advanced.freezeMode == "Legit" and Hum then
-        Hum.WalkSpeed = 0
-        Hum.JumpPower = 0
-    elseif config.advanced.freezeMode ~= "Legit" and Hum then
-        if Hum.WalkSpeed == 0 then Hum.WalkSpeed = wsDefault end
-        if Hum.JumpPower == 0 then Hum.JumpPower = jpDefault end
-    end
     if flyEnabled and flyBV and HRP then
         local dir=Vector3.new(); local camCF=camera.CFrame
         if UserInputService:IsKeyDown(Enum.KeyCode.W) then dir += camCF.LookVector end
@@ -2342,21 +1828,18 @@ table.insert(connections, RunService.RenderStepped:Connect(function()
         if dir.Magnitude>0 then dir=dir.Unit*config.flySpeed else dir=Vector3.new() end
         flyBV.Velocity=dir
     end
-    if Hum and sprinting and UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) and not flyEnabled then Hum.WalkSpeed=config.sprintSpeed
-    elseif Hum and sprinting and not flyEnabled then Hum.WalkSpeed=config.wsBoost end
+    if sprinting and UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) and not flyEnabled then Hum.WalkSpeed=config.sprintSpeed
+    elseif sprinting and not flyEnabled then Hum.WalkSpeed=config.wsBoost end
 end))
 
 table.insert(connections, RunService.RenderStepped:Connect(function()
-    if not scriptActive or not config.aimbotEnabled then return end
-    if not UserInputService:IsMouseButtonPressed(config.aimbotKey) then return end
-    if not HRP then return end
-    local target
-    if config.stickTarget and stickyTarget and stickyTarget.Parent then
-        target = stickyTarget
+    local target = nil
+    if config.stickTarget and _G.__stickyTarget and _G.__stickyTarget.Parent then
+        target = _G.__stickyTarget
     else
         target = getClosestTarget()
     end
-    if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+    if config.aimbotEnabled and target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") and UserInputService:IsMouseButtonPressed(config.aimbotKey) then
         pulseFov()
         local targetPos = target.Character.HumanoidRootPart.Position
         if config.aimbotArea=="Head" then local h=target.Character:FindFirstChild("Head"); if h then targetPos=h.Position end
@@ -2371,35 +1854,32 @@ table.insert(connections, RunService.RenderStepped:Connect(function()
             camera.CFrame=camera.CFrame:Lerp(look,config.aimbotSmooth)
             if config.triggerEnabled then VirtualInputManager:SendMouseButtonEvent(0,0,0,true,nil,0); VirtualInputManager:SendMouseButtonEvent(0,0,0,false,nil,0) end
         end
-        lastTargetName = target.Name
-        lastTargetDist = (targetPos - HRP.Position).Magnitude
+        _G.__lastTargetName = target.Name
+        _G.__lastTargetDist = (targetPos - HRP.Position).Magnitude
         if config.aimbotLegitDecay then config.aimbotFov = math.max(40, config.aimbotFov - 0.2) end
-        if config.stickTarget then stickyTarget = target end
+        if config.stickTarget then _G.__stickyTarget = target end
     end
 end))
 
 task.spawn(function()
-    while scriptActive do
+    while true do
         if autoClickEnabled then VirtualInputManager:SendMouseButtonEvent(0,0,0,true,nil,0); VirtualInputManager:SendMouseButtonEvent(0,0,0,false,nil,0) end
         task.wait(config.autoClickRate or 0.05)
     end
 end)
 
 task.spawn(function()
-    while scriptActive do
+    while true do
         if autoInteractEnabled then
-            updateInteractTags()
-            local hasFilter = lastInteractFilter ~= ""
-            for prompt in pairs(proximityPrompts) do
-                if not prompt.Parent then
-                    proximityPrompts[prompt] = nil
-                elseif prompt.Enabled then
+            for _,prompt in ipairs(workspace:GetDescendants()) do
+                if prompt:IsA("ProximityPrompt") and prompt.Enabled then
                     local allow = true
-                    if hasFilter then
+                    if config.autoInteractFilter and config.autoInteractFilter ~= "" then
                         allow=false
                         local text = string.lower(prompt.Name or "")
-                        for _,tag in ipairs(cachedInteractTags) do
-                            if text:find(tag, 1, true) then allow=true break end
+                        for tag in string.gmatch(string.lower(config.autoInteractFilter), "([^,]+)") do
+                            tag = tag:match("^%s*(.-)%s*$")
+                            if tag ~= "" and text:find(tag) then allow=true end
                         end
                     end
                     if allow then pcall(function() fireproximityprompt(prompt) end) end
@@ -2411,7 +1891,7 @@ task.spawn(function()
 end)
 
 task.spawn(function()
-    while scriptActive do
+    while true do
         if worldEspState.tags and config.worldScanInterval and config.worldScanInterval > 0 then
             addWorldTagESP(worldEspState.tags, worldEspState.fill or colors.accent, worldEspState.outline or colors.accent2)
             task.wait(config.worldScanInterval)
@@ -2422,151 +1902,95 @@ task.spawn(function()
 end)
 
 task.spawn(function()
-    while scriptActive do
+    while true do
+        if worldEspState.tags and config.worldScanInterval and config.worldScanInterval > 0 then
+            addWorldTagESP(worldEspState.tags, worldEspState.fill or colors.accent, worldEspState.outline or colors.accent2)
+            task.wait(config.worldScanInterval)
+        else
+            task.wait(1)
+        end
+    end
+end)
+
+task.spawn(function()
+    while true do
+        if worldEspState.tags and config.worldScanInterval and config.worldScanInterval > 0 then
+            addWorldTagESP(worldEspState.tags, worldEspState.fill or colors.accent, worldEspState.outline or colors.accent2)
+            task.wait(config.worldScanInterval)
+        else
+            task.wait(1)
+        end
+    end
+end)
+
+task.spawn(function()
+    while true do
+        if worldEspState.tags and config.worldScanInterval and config.worldScanInterval > 0 then
+            addWorldTagESP(worldEspState.tags, worldEspState.fill or colors.accent, worldEspState.outline or colors.accent2)
+            task.wait(config.worldScanInterval)
+        else
+            task.wait(1)
+        end
+    end
+end)
+
+task.spawn(function()
+    while true do
+        if worldEspState.tags and config.worldScanInterval and config.worldScanInterval > 0 then
+            addWorldTagESP(worldEspState.tags, worldEspState.fill or colors.accent, worldEspState.outline or colors.accent2)
+            task.wait(config.worldScanInterval)
+        else
+            task.wait(1)
+        end
+    end
+end)
+
+task.spawn(function()
+    while true do
+        if worldEspState.tags and config.worldScanInterval and config.worldScanInterval > 0 then
+            addWorldTagESP(worldEspState.tags, worldEspState.fill or colors.accent, worldEspState.outline or colors.accent2)
+            task.wait(config.worldScanInterval)
+        else
+            task.wait(1)
+        end
+    end
+end)
+
+task.spawn(function()
+    while true do
+        if worldEspState.tags and config.worldScanInterval and config.worldScanInterval > 0 then
+            addWorldTagESP(worldEspState.tags, worldEspState.fill or colors.accent, worldEspState.outline or colors.accent2)
+            task.wait(config.worldScanInterval)
+        else
+            task.wait(1)
+        end
+    end
+end)
+
+task.spawn(function()
+    while true do
         if config.antiAfk then VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Right, false, nil); VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Right, false, nil) end
         task.wait(30)
-    end
-end)
-
-task.spawn(function()
-    local lastCast, lastReel = 0, 0
-    while scriptActive do
-        local mineInterval = config.advanced.autoMineInterval or 0.6
-        if isFisch or isFishIt then
-            if config.fisch and (config.fisch.fullLoop or config.fisch.autoCast) then
-                if tick() - lastCast >= (config.fisch.autoCastDelay or 0.6) then
-                    firePromptsByTags({"cast","throw","fish"}, 60)
-                    lastCast = tick()
-                end
-            end
-            if config.fisch and (config.fisch.fullLoop or config.fisch.autoReel) then
-                if tick() - lastReel >= (config.fisch.autoReelDelay or 0.4) then
-                    firePromptsByTags({"reel","hook","pull","catch"}, 60)
-                    lastReel = tick()
-                end
-            end
-            if config.fisch and config.fisch.autoMiniGame then
-                firePromptsByTags({"minigame","perfect","timing","shake"}, 60)
-            end
-            if config.fisch and config.fisch.autoSellOnFull then
-                firePromptsByTags({"sell","vendor","shop"}, 80)
-            end
-            if config.fisch and config.fisch.autoDiscardTrash then
-                firePromptsByTags({"discard","trash"}, 40)
-            end
-            if config.fishit and config.fishit.autoSellFull then
-                firePromptsByTags({"sell","vendor","shop"}, 80)
-            end
-            if config.fishit and config.fishit.autoBait then
-                firePromptsByTags({"bait"}, 40)
-            end
-            if config.fishit and config.fishit.autoUpgradeTarget and config.fishit.autoUpgradeTarget > 0 then
-                firePromptsByTags({"upgrade","enhance"}, 60)
-            end
-        end
-        if isForge and config.forge then
-            if config.forge.autoInsert then
-                firePromptsByTags({"insert","forge","smelt","anvil"}, 60)
-            end
-            if config.forge.autoCollect then
-                firePromptsByTags({"collect","pickup"}, 60)
-            end
-        end
-        if isForge and config.forgeAdvanced then
-            local fa = config.forgeAdvanced
-            if fa.openForge then firePromptsByTags({"forge","open"}, 60) end
-            if fa.autoMelt then firePromptsByTags({"melt","smelt"}, 60) end
-            if fa.autoPour then firePromptsByTags({"pour"}, 40) end
-            if fa.autoHammer then firePromptsByTags({"hammer","anvil"}, 40) end
-            if fa.autoMineRocks then
-                local tags = parseTags(fa.rockTypeSelection)
-                if fa.areaFilter and fa.areaFilter ~= "" then
-                    tags = parseTags(fa.areaFilter)
-                end
-                if not fa.playerAvoidance or not isPlayerNearby(20) then
-                    firePromptsByTags(tags, fa.miningDistance or 50)
-                end
-            end
-            if fa.autoSellWeapons or fa.autoSellOres or fa.autoSellOnFull then
-                firePromptsByTags({"sell","vendor","shop","smith"}, 80)
-            end
-            if fa.timedAutoSell and (tick() % (fa.sellInterval or 45) < 0.4) then
-                firePromptsByTags({"sell","vendor","shop"}, 80)
-            end
-            if fa.buyPotions or fa.autoBuyWhenEmpty then
-                firePromptsByTags({"potion","buy"}, 60)
-            end
-            if fa.autoDrinkPotions then
-                firePromptsByTags({"drink","use"}, 40)
-            end
-            if fa.autoRerollRace then
-                firePromptsByTags({"reroll","race"}, 60)
-            end
-            if fa.claimAll or fa.claimAllOres or fa.claimAllEnemies or fa.claimAllEquipment then
-                firePromptsByTags({"claim","reward"}, 80)
-            end
-        end
-        if config.advanced.autoMine then
-            firePromptsByTags(parseTags(config.advanced.autoMineTags), 70)
-        end
-        task.wait(mineInterval)
-    end
-end)
-
-task.spawn(function()
-    local lastKill, lastEquip = 0, 0
-    while scriptActive do
-        if config.advanced.autoEquipRod and tick() - lastEquip >= (config.advanced.autoEquipInterval or 2) then
-            equipToolByPriority(config.advanced.rodPriority)
-            lastEquip = tick()
-        end
-        if config.advanced.autoKill and HRP then
-            if tick() - lastKill >= (config.advanced.autoKillInterval or 0.25) then
-                local target = findNearestTarget(config.advanced.autoKillRange or 60, config.advanced.autoKillPlayers, config.advanced.autoKillNPCs)
-                if target then
-                    local tool = Char and Char:FindFirstChildOfClass("Tool")
-                    if tool and tool.Activate then tool:Activate() else VirtualInputManager:SendMouseButtonEvent(0,0,0,true,nil,0); VirtualInputManager:SendMouseButtonEvent(0,0,0,false,nil,0) end
-                end
-                lastKill = tick()
-            end
-        end
-        if isForge and config.forgeAdvanced and config.forgeAdvanced.autoAttackMobs and HRP then
-            if tick() - lastKill >= (config.advanced.autoKillInterval or 0.25) then
-                local target = findNearestTarget(config.forgeAdvanced.attackDistance or 60, false, true)
-                if target then
-                    local tool = Char and Char:FindFirstChildOfClass("Tool")
-                    if tool and tool.Activate then tool:Activate() else VirtualInputManager:SendMouseButtonEvent(0,0,0,true,nil,0); VirtualInputManager:SendMouseButtonEvent(0,0,0,false,nil,0) end
-                end
-                lastKill = tick()
-            end
-        end
-        task.wait(0.1)
     end
 end)
 
 local last=tick()
 local sessionStart = tick()
 table.insert(connections, RunService.RenderStepped:Connect(function()
-    if not scriptActive then return end
     local now=tick(); local fps=1/math.max(now-last, 1/60); last=now
-    if now - lastOverlayUpdate < overlayUpdateRate then return end
-    lastOverlayUpdate = now
-    local ping = 0
-    pcall(function()
-        ping = math.floor(Stats.Network.ServerStatsItem["Data Ping"]:GetValue() or 0)
-    end)
+    local ping=math.floor(Stats.Network.ServerStatsItem["Data Ping"]:GetValue() or 0)
     local session = math.floor(now - sessionStart)
     statusLabel.Text = string.format("FPS: %d | Ping: %dms | %ds | LastCfg: %s", math.floor(fps), ping, session, config.lastConfig ~= "" and config.lastConfig or "none")
     local targetText = ""
-    if lastTargetName and lastTargetDist then
-        targetText = string.format(" | Target: %s (%dm)", lastTargetName, math.floor(lastTargetDist))
+    if _G.__lastTargetName and _G.__lastTargetDist then
+        targetText = string.format(" | Target: %s (%dm)", _G.__lastTargetName, math.floor(_G.__lastTargetDist))
     end
     overlayLabel.Text = string.format("FPS: %d | Ping: %dms | Mode: %s%s", math.floor(fps), ping, config.aimbotEnabled and "Aimbot" or "Idle", targetText)
 end))
 
 -- Float anim
 task.spawn(function()
-    while scriptActive and gui.Parent do
+    while gui.Parent do
         if config.animations then
             tween(main,1.6,{Position=UDim2.new(main.Position.X.Scale,main.Position.X.Offset,main.Position.Y.Scale,main.Position.Y.Offset+4)},Enum.EasingStyle.Sine,Enum.EasingDirection.InOut)
             task.wait(1.6)
@@ -2579,12 +2003,11 @@ task.spawn(function()
 end)
 
 -- Respawn
-table.insert(connections, LP.CharacterAdded:Connect(function(newChar)
+LP.CharacterAdded:Connect(function(newChar)
     Char=newChar; Hum=Char:WaitForChild("Humanoid"); HRP=Char:WaitForChild("HumanoidRootPart")
     wsDefault=Hum.WalkSpeed; jpDefault=Hum.JumpPower
-    bindHumanoid(Hum)
     if config.esp.enabled then task.delay(1,function() clearESP(); for _,pl in ipairs(Players:GetPlayers()) do addESP(pl) end end) end
-end))
+end)
 
 applyTheme()
 setBlur(config.uiBlur, config.blurSize or 10)
