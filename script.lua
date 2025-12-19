@@ -103,6 +103,14 @@ local config = {
     worldScanInterval = 3,
     overlayDock = "TL",
     recentConfigs = {},
+    keySystem = {
+        enabled = true,
+        validKeys = {"ADV-DEMO-123", "ADV-FRIEND-777"},
+        verifyEndpoint = "",
+        websiteUrl = "https://example.com/get-key",
+        discordUrl = "https://discord.gg/example",
+        lastKey = "",
+    },
 
     -- Generated mega-feature tracker keeps a record of the 1000 micro-features and improvements shown in the dashboard preview
     featureCatalog = {},
@@ -148,6 +156,11 @@ local config = {
         tpUpgrade="Upgrade Station",
         tpBait="Bait Vendor",
         savedWaypoint="Favorite 1",
+        rarityFilter="Common,Uncommon,Rare",
+        valueFilter=0,
+        whitelist="",
+        blacklist="",
+        mode="Money",
         xpMode=false,
         moneyMode=true,
         autoSellFull=true,
@@ -168,10 +181,14 @@ local config = {
         fov=80,
         overlayMode="Money/hour",
         eventOnly=false,
+        eventAlerts=true,
         tpEventOnStart=true,
+        hotspotWaypoints={"Hotspot 1","Hotspot 2","Hotspot 3"},
         antiAfk=true,
+        rejoinMode="None",
         rejoinLowPop=false,
         profile="Ocean Farm",
+        miniHud=true,
     },
     fischPro = {
         mode="Always complete",
@@ -183,12 +200,14 @@ local config = {
         region="Ocean",
         routePreset="Snowcap cave route",
         conditionPreset="Foggy night mythic",
+        conditionMode="Auto-best",
         autoSwitchTime=true,
         autoSwitchWeather=true,
         loadout="Deep ocean mythic",
         baitRule="Don’t waste rare bait",
         boatRoute="Harbor loop",
         bestiaryFocus="Mythic",
+        bestiaryMissing=true,
         hotspotEsp=true,
         landmarkEsp=true,
         mythicMarker=true,
@@ -202,6 +221,7 @@ local config = {
         rejoinMode="None",
         overlayProfile="Session",
         theme="Nautical",
+        sessionHud=true,
     },
     forgePlanner = {
         tab="Home",
@@ -210,10 +230,15 @@ local config = {
         oreGoal=1000,
         recipeTag="DPS",
         weaponProfile="Fire greatsword",
+        weaponCompare="Crit dual blades",
         armorProfile="Goblin Cave tank set",
+        armorCompare="Volcanic Depths survival",
         runePage="DPS page",
+        runeTarget="Tank page",
         zoneRoute="Recommended order",
+        progressionPreset="Quest-first",
         economyMode="Sell vs Forge",
+        goalType="Gold/hour",
         overlay=true,
     },
     forge = {autoInsert=true, autoCollect=true, anvilTolerance=0.18},
@@ -548,6 +573,208 @@ local function makeDropdown(parent,label,options,cb,defaultVal)
     set(defaultVal or options[1]); return set
 end
 
+-- Key system helpers
+local function verifyKey(inputKey)
+    if not config.keySystem or config.keySystem.enabled == false then
+        return true, "Key system disabled"
+    end
+    if not inputKey or inputKey == "" then
+        return false, "Enter your key"
+    end
+    if config.keySystem.lastKey == inputKey then
+        return true, "Cached: welcome back"
+    end
+    for _,k in ipairs(config.keySystem.validKeys or {}) do
+        if k == inputKey then
+            config.keySystem.lastKey = inputKey
+            return true, "Key accepted"
+        end
+    end
+    if config.keySystem.verifyEndpoint and config.keySystem.verifyEndpoint ~= "" then
+        local url = string.format("%s?key=%s", config.keySystem.verifyEndpoint, HttpService:UrlEncode(inputKey))
+        local ok, res = pcall(function()
+            return http_request({Url=url, Method="GET"})
+        end)
+        if ok and res and res.StatusCode == 200 then
+            local decodeOk, body = pcall(function()
+                return HttpService:JSONDecode(res.Body)
+            end)
+            if decodeOk then
+                local valid = body.valid == true or body.status == "ok" or body.keyValid == true
+                if valid then
+                    config.keySystem.lastKey = inputKey
+                    return true, body.message or "Key verified"
+                end
+            end
+        end
+    end
+    return false, "Invalid or expired key"
+end
+
+local function copyLink(url, label)
+    if not url or url == "" then
+        toast(label .. " link unavailable")
+        return
+    end
+    pcall(function()
+        if setclipboard then setclipboard(url) end
+    end)
+    toast(label .. " link copied")
+end
+
+local function requireKeyGate()
+    if not config.keySystem or config.keySystem.enabled == false then return true end
+    local accepted = false
+    local gateDone = Instance.new("BindableEvent")
+
+    local gateGui = Instance.new("ScreenGui")
+    gateGui.Name = "KeyGate"
+    gateGui.ResetOnSpawn = false
+    gateGui.Parent = game:GetService("CoreGui")
+
+    local shade = Instance.new("Frame")
+    shade.Size = UDim2.new(1,0,1,0)
+    shade.BackgroundColor3 = Color3.new(0,0,0)
+    shade.BackgroundTransparency = 0.45
+    shade.BorderSizePixel = 0
+    shade.Parent = gateGui
+
+    local panel = Instance.new("Frame")
+    panel.Size = UDim2.new(0, 420, 0, 260)
+    panel.Position = UDim2.new(0.5,-210,0.5,-130)
+    panel.BackgroundColor3 = colors.panel:lerp(colors.accent2,0.08)
+    panel.BackgroundTransparency = 0.06
+    panel.BorderSizePixel = 0
+    panel.Parent = gateGui
+    makeCorner(panel,16)
+    stylizeCard(panel)
+
+    local grad = Instance.new("UIGradient", panel)
+    grad.Rotation = 35
+    grad.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, colors.panel),
+        ColorSequenceKeypoint.new(1, colors.panel:lerp(colors.accent,0.14)),
+    })
+
+    local title = Instance.new("TextLabel")
+    title.BackgroundTransparency = 1
+    title.Size = UDim2.new(1,-20,0,34)
+    title.Position = UDim2.new(0,10,0,12)
+    title.Font = Enum.Font.GothamBold
+    title.TextColor3 = colors.text
+    title.TextSize = 20
+    title.TextXAlignment = Enum.TextXAlignment.Left
+    title.Text = "Premium Access Required"
+    title.Parent = panel
+
+    local subtitle = Instance.new("TextLabel")
+    subtitle.BackgroundTransparency = 1
+    subtitle.Size = UDim2.new(1,-20,0,18)
+    subtitle.Position = UDim2.new(0,10,0,44)
+    subtitle.Font = Enum.Font.Gotham
+    subtitle.TextColor3 = colors.subtle
+    subtitle.TextSize = 14
+    subtitle.TextXAlignment = Enum.TextXAlignment.Left
+    subtitle.Text = "Enter your key to unlock the hub"
+    subtitle.Parent = panel
+
+    local input = Instance.new("TextBox")
+    input.Size = UDim2.new(1,-20,0,38)
+    input.Position = UDim2.new(0,10,0,76)
+    input.BackgroundColor3 = colors.bg:lerp(colors.accent2,0.06)
+    input.BackgroundTransparency = 0.08
+    input.BorderSizePixel = 0
+    input.Font = Enum.Font.GothamSemibold
+    input.TextSize = 15
+    input.TextColor3 = colors.text
+    input.PlaceholderText = "Enter key here"
+    input.ClearTextOnFocus = false
+    input.Parent = panel
+    makeCorner(input,10)
+
+    local status = Instance.new("TextLabel")
+    status.BackgroundTransparency = 1
+    status.Size = UDim2.new(1,-20,0,18)
+    status.Position = UDim2.new(0,10,0,120)
+    status.Font = Enum.Font.Gotham
+    status.TextColor3 = colors.subtle
+    status.TextSize = 13
+    status.TextXAlignment = Enum.TextXAlignment.Left
+    status.Text = "Waiting for key..."
+    status.Parent = panel
+
+    local buttons = Instance.new("Frame")
+    buttons.Size = UDim2.new(1,-20,0,44)
+    buttons.Position = UDim2.new(0,10,0,152)
+    buttons.BackgroundTransparency = 1
+    buttons.Parent = panel
+    local bl = Instance.new("UIListLayout", buttons)
+    bl.FillDirection = Enum.FillDirection.Horizontal
+    bl.Padding = UDim.new(0,8)
+    bl.HorizontalAlignment = Enum.HorizontalAlignment.Center
+
+    local function makeKeyButton(text, color, callback)
+        local b = Instance.new("TextButton")
+        b.Size = UDim2.new(0.33,-6,1,0)
+        b.BackgroundColor3 = color
+        b.BackgroundTransparency = 0.08
+        b.BorderSizePixel = 0
+        b.AutoButtonColor = false
+        b.Font = Enum.Font.GothamSemibold
+        b.TextColor3 = Color3.new(1,1,1)
+        b.TextSize = 14
+        b.Text = text
+        b.Parent = buttons
+        makeCorner(b,12)
+        b.MouseEnter:Connect(function() tween(b,0.1,{BackgroundTransparency=0}) end)
+        b.MouseLeave:Connect(function() tween(b,0.12,{BackgroundTransparency=0.08}) end)
+        b.MouseButton1Click:Connect(function()
+            ripple(b)
+            if callback then callback() end
+        end)
+        return b
+    end
+
+    local verifying = false
+    local function attemptVerify()
+        if verifying then return end
+        verifying = true
+        status.TextColor3 = colors.subtle
+        status.Text = "Verifying..."
+        task.spawn(function()
+            local ok,msg = verifyKey(input.Text)
+            if ok then
+                status.TextColor3 = colors.success
+                status.Text = msg or "Key accepted"
+                accepted = true
+                task.delay(0.35, function()
+                    gateGui:Destroy()
+                    gateDone:Fire(true)
+                end)
+            else
+                status.TextColor3 = colors.danger
+                status.Text = msg or "Invalid key"
+                verifying = false
+            end
+        end)
+    end
+
+    makeKeyButton("Verify Key", colors.accent, attemptVerify)
+    makeKeyButton("Get Key", colors.warn, function()
+        copyLink(config.keySystem.websiteUrl, "Key website")
+    end)
+    makeKeyButton("Discord", colors.accent2, function()
+        copyLink(config.keySystem.discordUrl, "Discord invite")
+    end)
+
+    input.FocusLost:Connect(function(enter)
+        if enter then attemptVerify() end
+    end)
+
+    gateDone.Event:Wait()
+    return accepted
+end
+
 -- ESP helpers
 local function clearESP()
     for _,o in ipairs(highlightObjects) do o:Destroy() end
@@ -654,15 +881,49 @@ local function buildFishAutomation(parent)
         makeDropdown(parent,"Vendor teleports",{"Shop","Sell NPC","Bait Vendor","Upgrade Station"},function(v) config.fishit.tpVendor=v end, config.fishit.tpVendor)
         makeButton(parent,"Teleport to vendor",function() pushSessionEvent("Fish It vendor TP: "..(config.fishit.tpVendor or "Shop")) end)
         makeDropdown(parent,"Saved waypoint",{"Favorite 1","Favorite 2","Favorite 3"},function(v) config.fishit.savedWaypoint=v end, config.fishit.savedWaypoint)
+        local hopRow=Instance.new("Frame"); hopRow.Size=UDim2.new(1,-10,0,28); hopRow.BackgroundTransparency=1; hopRow.Parent=parent
+        local hopList=Instance.new("UIListLayout",hopRow); hopList.FillDirection=Enum.FillDirection.Horizontal; hopList.Padding=UDim.new(0,6)
+        for _,label in ipairs(config.fishit.hotspotWaypoints) do
+            local b=Instance.new("TextButton"); b.Size=UDim2.fromOffset(90,24); b.BackgroundColor3=colors.bg; b.BorderSizePixel=0; b.TextColor3=colors.text; b.Font=Enum.Font.GothamSemibold; b.TextSize=13; b.Text=label; makeCorner(b,8); b.Parent=hopRow
+            b.MouseButton1Click:Connect(function() toast("Teleporting to "..label); pushSessionEvent("Fish It hop: "..label) end)
+        end
+        addDivider(parent)
+
+        sectionTitle(parent,"Fish It Targeting & Filters")
+        local fiRarity=Instance.new("TextBox"); fiRarity.Size=UDim2.new(1,-10,0,30); fiRarity.BackgroundColor3=colors.bg; fiRarity.TextColor3=colors.text; fiRarity.Text=config.fishit.rarityFilter; fiRarity.PlaceholderText="Rarity filter (comma)"; fiRarity.BorderSizePixel=0; fiRarity.Font=Enum.Font.Gotham; fiRarity.TextSize=14; makeCorner(fiRarity,8); fiRarity.Parent=parent; fiRarity.FocusLost:Connect(function() config.fishit.rarityFilter=fiRarity.Text end)
+        makeSlider(parent,"Value filter (keep >= coins)",0,2000,config.fishit.valueFilter or 0,function(v) config.fishit.valueFilter=v end)
+        local fiWhite=Instance.new("TextBox"); fiWhite.Size=UDim2.new(1,-10,0,30); fiWhite.BackgroundColor3=colors.bg; fiWhite.TextColor3=colors.text; fiWhite.Text=config.fishit.whitelist; fiWhite.PlaceholderText="Whitelist (always keep)"; fiWhite.BorderSizePixel=0; fiWhite.Font=Enum.Font.Gotham; fiWhite.TextSize=14; makeCorner(fiWhite,8); fiWhite.Parent=parent; fiWhite.FocusLost:Connect(function() config.fishit.whitelist=fiWhite.Text end)
+        local fiBlack=Instance.new("TextBox"); fiBlack.Size=UDim2.new(1,-10,0,30); fiBlack.BackgroundColor3=colors.bg; fiBlack.TextColor3=colors.text; fiBlack.Text=config.fishit.blacklist; fiBlack.PlaceholderText="Blacklist junk"; fiBlack.BorderSizePixel=0; fiBlack.Font=Enum.Font.Gotham; fiBlack.TextSize=14; makeCorner(fiBlack,8); fiBlack.Parent=parent; fiBlack.FocusLost:Connect(function() config.fishit.blacklist=fiBlack.Text end)
+        makeDropdown(parent,"Mode",{"Money","XP","Event"},function(v) config.fishit.mode=v end, config.fishit.mode)
+        makeToggle(parent,"XP mode",function(on) config.fishit.xpMode=on end, config.fishit.xpMode)
+        makeToggle(parent,"Money mode",function(on) config.fishit.moneyMode=on end, config.fishit.moneyMode)
+        addDivider(parent)
+
+        sectionTitle(parent,"Fish It Inventory & Selling")
+        makeToggle(parent,"Auto-sell when full",function(on) config.fishit.autoSellFull=on end, config.fishit.autoSellFull)
+        makeDropdown(parent,"Auto-sell below rarity",{"Common","Uncommon","Rare","Epic","Legendary"},function(v) config.fishit.autoSellRarity=v end, config.fishit.autoSellRarity)
+        makeSlider(parent,"Auto-sell below value",0,2000,config.fishit.autoSellValue or 250,function(v) config.fishit.autoSellValue=v end)
+        makeToggle(parent,"Auto-discard junk",function(on) config.fishit.autoDiscardJunk=on end, config.fishit.autoDiscardJunk)
+        makeToggle(parent,"Lock favorites",function(on) config.fishit.lockFavorites=on end, config.fishit.lockFavorites)
+        makeDropdown(parent,"Sort fish by",{"Rarity","Value","Size"},function(v) config.fishit.sortMode=v end, config.fishit.sortMode)
+        addDivider(parent)
+
+        sectionTitle(parent,"Fish It Visuals & HUD")
         makeToggle(parent,"Hotspot ESP",function(on) config.fishit.hotspotEsp=on end, config.fishit.hotspotEsp)
         makeToggle(parent,"Vendor/NPC ESP",function(on) config.fishit.vendorEsp=on end, config.fishit.vendorEsp)
         makeToggle(parent,"Pier labels",function(on) config.fishit.pierLabels=on end, config.fishit.pierLabels)
         makeToggle(parent,"Fullbright / no fog",function(on) config.fishit.fullbright=on; config.fishit.noFog=on end, config.fishit.fullbright)
         makeSlider(parent,"Camera FOV",60,110,config.fishit.fov,function(v) config.fishit.fov=v; camera.FieldOfView=v end)
         makeDropdown(parent,"Overlay mode",{"Money/hour","XP/hour","Fish per minute"},function(v) config.fishit.overlayMode=v end, config.fishit.overlayMode)
+        makeToggle(parent,"Mini HUD (mode/location/time)",function(on) config.fishit.miniHud=on end, config.fishit.miniHud)
+        addDivider(parent)
+
+        sectionTitle(parent,"Events & Server Tools")
         makeToggle(parent,"Event-only fishing",function(on) config.fishit.eventOnly=on end, config.fishit.eventOnly)
+        makeToggle(parent,"Event alerts",function(on) config.fishit.eventAlerts=on end, config.fishit.eventAlerts)
         makeToggle(parent,"Teleport to event on start",function(on) config.fishit.tpEventOnStart=on end, config.fishit.tpEventOnStart)
         makeToggle(parent,"Anti-AFK",function(on) config.fishit.antiAfk=on end, config.fishit.antiAfk)
+        makeDropdown(parent,"Rejoin mode",{"None","Same server","Low-pop","High-pop"},function(v) config.fishit.rejoinMode=v end, config.fishit.rejoinMode)
         makeToggle(parent,"Rejoin low-pop server",function(on) config.fishit.rejoinLowPop=on end, config.fishit.rejoinLowPop)
         addDivider(parent)
     end
@@ -673,6 +934,7 @@ local function buildFishAutomation(parent)
         makeDropdown(parent,"Route preset",{"Snowcap cave route","Ocean mythic loop","Harbor hotspots"},function(v) config.fischPro.routePreset=v end, config.fischPro.routePreset)
         makeDropdown(parent,"Condition preset",{"Foggy night mythic","Sunny day legendary","Rainy treasure"},function(v) config.fischPro.conditionPreset=v end, config.fischPro.conditionPreset)
         makeToggle(parent,"Auto-switch on time/weather",function(on) config.fischPro.autoSwitchTime=on; config.fischPro.autoSwitchWeather=on end, config.fischPro.autoSwitchTime)
+        makeDropdown(parent,"Condition mode",{"Auto-best","Weather-first","Time-first"},function(v) config.fischPro.conditionMode=v end, config.fischPro.conditionMode)
         makeDropdown(parent,"Mode",{"Always complete","Perfect focus","Humanized"},function(v) config.fischPro.mode=v end, config.fischPro.mode)
         makeDropdown(parent,"Rarity target",{"Trash","Common","Uncommon","Unusual","Rare","Legendary","Mythical","Relic","Event"},function(v) config.fischPro.rarityTier=v end, config.fischPro.rarityTier)
         makeSlider(parent,"Value filter (sell <)",0,3000,config.fischPro.autoSellValue or 500,function(v) config.fischPro.autoSellValue=v end)
@@ -683,6 +945,7 @@ local function buildFishAutomation(parent)
         makeDropdown(parent,"Bait rule",{"Don’t waste rare bait","Use best bait","Use cheap bait"},function(v) config.fischPro.baitRule=v end, config.fischPro.baitRule)
         makeDropdown(parent,"Boat route",{"Harbor loop","Island hop","Dock > hotspot"},function(v) config.fischPro.boatRoute=v end, config.fischPro.boatRoute)
         makeDropdown(parent,"Bestiary focus",{"Mythic","Relic","Event","Full completion"},function(v) config.fischPro.bestiaryFocus=v end, config.fischPro.bestiaryFocus)
+        makeToggle(parent,"Highlight missing fish",function(on) config.fischPro.bestiaryMissing=on end, config.fischPro.bestiaryMissing)
         makeToggle(parent,"Hotspot ESP",function(on) config.fischPro.hotspotEsp=on end, config.fischPro.hotspotEsp)
         makeToggle(parent,"Landmark ESP",function(on) config.fischPro.landmarkEsp=on end, config.fischPro.landmarkEsp)
         makeToggle(parent,"Mythic condition markers",function(on) config.fischPro.mythicMarker=on end, config.fischPro.mythicMarker)
@@ -692,6 +955,7 @@ local function buildFishAutomation(parent)
         local bossBox=Instance.new("TextBox"); bossBox.Size=UDim2.new(1,-10,0,30); bossBox.BackgroundColor3=colors.bg; bossBox.TextColor3=colors.text; bossBox.Text=config.fischPro.bossTargets; bossBox.PlaceholderText="Boss/secret fish targets"; bossBox.BorderSizePixel=0; bossBox.Font=Enum.Font.Gotham; bossBox.TextSize=14; makeCorner(bossBox,8); bossBox.Parent=parent; bossBox.FocusLost:Connect(function() config.fischPro.bossTargets=bossBox.Text end)
         makeDropdown(parent,"Rejoin mode",{"None","Same server","New low-pop","New high-pop"},function(v) config.fischPro.rejoinMode=v end, config.fischPro.rejoinMode)
         makeDropdown(parent,"Overlay profile",{"Session","Coins/hour","XP/hour"},function(v) config.fischPro.overlayProfile=v end, config.fischPro.overlayProfile)
+        makeToggle(parent,"Session HUD",function(on) config.fischPro.sessionHud=on end, config.fischPro.sessionHud)
         addDivider(parent)
     end
 end
@@ -710,11 +974,21 @@ local function buildForgePlanner(parent)
     makeDropdown(parent,"Recipe tag",{"DPS","Tank","Hybrid","Farm"},function(v) config.forgePlanner.recipeTag=v end, config.forgePlanner.recipeTag)
     makeDropdown(parent,"Weapon profile",{"Fire greatsword","Crit dual blades","Safe tank sword"},function(v) config.forgePlanner.weaponProfile=v end, config.forgePlanner.weaponProfile)
     makeDropdown(parent,"Armor profile",{"Goblin Cave tank set","Volcanic Depths survival","Boss fight kit"},function(v) config.forgePlanner.armorProfile=v end, config.forgePlanner.armorProfile)
+    makeDropdown(parent,"Compare weapon",{"Crit dual blades","Balanced longsword","Cleaver"},function(v) config.forgePlanner.weaponCompare=v end, config.forgePlanner.weaponCompare)
+    makeDropdown(parent,"Compare armor",{"Volcanic Depths survival","Boss fight kit","Light scout"},function(v) config.forgePlanner.armorCompare=v end, config.forgePlanner.armorCompare)
     addDivider(parent)
 
     sectionTitle(parent,"Runes & Builds")
     makeDropdown(parent,"Rune page",{"DPS page","Tank page","Utility/balance"},function(v) config.forgePlanner.runePage=v end, config.forgePlanner.runePage)
+    makeDropdown(parent,"Rune target",{"Tank page","Utility/balance","Hybrid"},function(v) config.forgePlanner.runeTarget=v end, config.forgePlanner.runeTarget)
     makeDropdown(parent,"Zone roadmap",{"Recommended order","Danger-first","Quest-first"},function(v) config.forgePlanner.zoneRoute=v end, config.forgePlanner.zoneRoute)
+    makeDropdown(parent,"Progression preset",{"Quest-first","Economy","Boss prep"},function(v) config.forgePlanner.progressionPreset=v end, config.forgePlanner.progressionPreset)
+    addDivider(parent)
+
+    sectionTitle(parent,"Weapon & Armor Planner")
+    makeDropdown(parent,"Goal type",{"Gold/hour","Ore/hour","Power"},function(v) config.forgePlanner.goalType=v end, config.forgePlanner.goalType)
+    makeDropdown(parent,"Weapon build",{"Fire greatsword build","Crit dual-blade build","Safe tanky sword"},function(v) config.forgePlanner.weaponProfile=v end, config.forgePlanner.weaponProfile)
+    makeDropdown(parent,"Armor build",{"Goblin Cave tank set","Volcanic Depths survival set","Boss fight kit"},function(v) config.forgePlanner.armorProfile=v end, config.forgePlanner.armorProfile)
     addDivider(parent)
 
     sectionTitle(parent,"Session HUD")
@@ -774,6 +1048,11 @@ function addESP(plr)
 end
 
 Players.PlayerAdded:Connect(function(p) p.CharacterAdded:Connect(function() if config.esp.enabled then addESP(p) end end) end)
+
+-- Require key before loading full UI
+if not requireKeyGate() then
+    return
+end
 
 -- GUI root
 local gui = Instance.new("ScreenGui"); gui.Name="AdvancedMenu"; gui.ResetOnSpawn=false; gui.Parent=game:GetService("CoreGui")
@@ -1679,6 +1958,17 @@ end)
 
 task.spawn(function()
     while true do
+        if worldEspState.tags and config.worldScanInterval and config.worldScanInterval > 0 then
+            addWorldTagESP(worldEspState.tags, worldEspState.fill or colors.accent, worldEspState.outline or colors.accent2)
+            task.wait(config.worldScanInterval)
+        else
+            task.wait(1)
+        end
+    end
+end)
+
+task.spawn(function()
+    while true do
         if config.antiAfk then VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Right, false, nil); VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Right, false, nil) end
         task.wait(30)
     end
@@ -1741,4 +2031,3 @@ if not ok then
         })
     end)
 end
-
